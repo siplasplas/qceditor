@@ -8,15 +8,11 @@
 #include <qce/FoldState.h>
 #include <qce/kate/KateXmlReader.h>
 
-static bool isCppExtension(const QString& ext)
-{
-    static const QStringList cpp = {"c","cpp","cxx","cc","h","hpp","hxx"};
-    return cpp.contains(ext.toLower());
-}
-
 static QString syntaxFileForExtension(const QString& ext)
 {
     static const QMap<QString, QString> map = {
+        {"c",   "c"},    {"cpp","cpp"},  {"cxx","cpp"},  {"cc","cpp"},
+        {"h",   "cpp"},  {"hpp","cpp"},  {"hxx","cpp"},
         {"py",  "python"},
         {"js",  "javascript"},
         {"ts",  "typescript"},
@@ -31,6 +27,32 @@ static QString syntaxFileForExtension(const QString& ext)
         {"go",  "go"},
     };
     return map.value(ext.toLower());
+}
+
+static bool isCppExtension(const QString& ext)
+{
+    static const QStringList cpp = {"c","cpp","cxx","cc","h","hpp","hxx"};
+    return cpp.contains(ext.toLower());
+}
+
+static QStringList kateSyntaxSearchDirs()
+{
+    return {
+        QDir::homePath() + "/.local/share/org.kde.syntax-highlighting/syntax",
+        "/usr/share/katepart5/syntax",
+        "/usr/share/kde4/apps/katepart/syntax",
+        "/usr/share/ktexteditor5/syntax",
+    };
+}
+
+static QString findKateXml(const QString& syntaxName)
+{
+    for (const QString& dir : kateSyntaxSearchDirs()) {
+        QString path = dir + "/" + syntaxName + ".xml";
+        if (QFile::exists(path))
+            return path;
+    }
+    return {};
 }
 
 EditorTab::EditorTab(QWidget* parent)
@@ -122,32 +144,27 @@ bool EditorTab::saveAs(const QString& path)
 
 void EditorTab::applyHighlighterForFile(const QString& path)
 {
-    QString ext = QFileInfo(path).suffix();
-
-    if (isCppExtension(ext)) {
-        applyCppHighlighter();
-        return;
-    }
-
+    QString ext        = QFileInfo(path).suffix().toLower();
     QString syntaxName = syntaxFileForExtension(ext);
+
     if (syntaxName.isEmpty()) {
         clearHighlighter();
         return;
     }
 
-    QStringList searchDirs = {
-        "/usr/share/katepart5/syntax",
-        "/usr/share/kde4/apps/katepart/syntax",
-        "/usr/share/ktexteditor5/syntax",
-        QDir::homePath() + "/.local/share/org.kde.syntax-highlighting/syntax",
-    };
-    for (const QString& dir : searchDirs) {
-        QString candidate = dir + "/" + syntaxName + ".xml";
-        if (QFile::exists(candidate)) {
-            applyKateHighlighter(candidate);
-            return;
-        }
+    QString xmlPath = findKateXml(syntaxName);
+
+    if (!xmlPath.isEmpty()) {
+        applyKateHighlighter(xmlPath);
+        return;
     }
+
+    // No Kate XML found — fall back to built-in programmatic highlighter for C/C++
+    if (isCppExtension(ext)) {
+        applyCppHighlighter();
+        return;
+    }
+
     clearHighlighter();
 }
 
