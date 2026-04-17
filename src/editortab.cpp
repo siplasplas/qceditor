@@ -305,12 +305,19 @@ void EditorTab::applyKateHighlighter(const QString& xmlPath)
     auto hl = KateXmlReader::load(xmlPath);
     if (!hl) { clearHighlighter(); return; }
 
-    m_foldProvider.reset();
-    m_edit->area()->setFoldingProvider(nullptr);
-    m_edit->area()->setWordWrap(false);
-
     m_highlighter = std::move(hl);
     m_edit->area()->setHighlighter(m_highlighter.get());
+
+    m_foldProvider = std::make_unique<qce::RuleBasedFoldingProvider>(m_highlighter.get());
+    m_foldProvider->setPlaceholderFor("Brace1",  "{…}");
+    m_foldProvider->setPlaceholderFor("brace",   "{…}");
+    m_foldProvider->setPlaceholderFor("curly",   "{…}");
+    m_foldProvider->setPlaceholderFor("square",  "[…]");
+    m_foldProvider->setPlaceholderFor("paren",   "(…)");
+    m_foldProvider->setPlaceholderFor("Comment", "/*…*/");
+    m_foldProvider->setPlaceholderFor("Region1", "//BEGIN…END");
+    m_edit->area()->setFoldingProvider(m_foldProvider.get());
+    m_edit->area()->setWordWrap(true); // fold gutter requires wrap mode to render arrows
 }
 
 void EditorTab::clearHighlighter()
