@@ -280,6 +280,7 @@ void EditorTab::applyCppHighlighter()
     m_foldProvider->setPlaceholderFor("curly",   "{…}");
     m_foldProvider->setPlaceholderFor("Comment", "/*…*/");
     m_edit->area()->setFoldingProvider(m_foldProvider.get());
+    m_edit->area()->setWordWrap(true); // fold gutter requires wrap mode to render arrows
 }
 
 void EditorTab::applyKateHighlighter(const QString& xmlPath)
@@ -289,6 +290,7 @@ void EditorTab::applyKateHighlighter(const QString& xmlPath)
 
     m_foldProvider.reset();
     m_edit->area()->setFoldingProvider(nullptr);
+    m_edit->area()->setWordWrap(false);
 
     m_highlighter = std::move(hl);
     m_edit->area()->setHighlighter(m_highlighter.get());
@@ -298,6 +300,7 @@ void EditorTab::clearHighlighter()
 {
     m_edit->area()->setHighlighter(nullptr);
     m_edit->area()->setFoldingProvider(nullptr);
+    m_edit->area()->setWordWrap(false);
     m_highlighter.reset();
     m_foldProvider.reset();
 }
