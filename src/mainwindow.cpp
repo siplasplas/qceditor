@@ -61,8 +61,6 @@ MainWindow::MainWindow(QWidget* parent)
             this, &MainWindow::onTabAboutToClose);
     connect(m_tabs, &QTabWidget::currentChanged,
             this, &MainWindow::onCurrentTabChanged);
-
-    createTab();
 }
 
 EditorTab* MainWindow::currentTab() const
