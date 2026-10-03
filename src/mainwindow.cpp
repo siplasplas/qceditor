@@ -11,6 +11,12 @@
 #include <QKeySequence>
 #include <QSettings>
 #include <QTimer>
+#include <QInputDialog>
+#include <QLineEdit>
+#include <QDialogButtonBox>
+#include <QPushButton>
+#include <QRegularExpression>
+#include <optional>
 #include <qce/CodeEditArea.h>
 #include <qce/TextCursor.h>
 #include <qce/kate/KateDataDownloader.h>
@@ -86,6 +92,11 @@ MainWindow::MainWindow(QWidget* parent)
         if (auto* tab = currentTab()) tab->findNext(true);
     });
 
+    searchMenu->addSeparator();
+    auto* goTo = searchMenu->addAction(tr("&Go to Line/Column..."));
+    goTo->setShortcut(QKeySequence(Qt::CTRL | Qt::Key_G));
+    connect(goTo, &QAction::triggered, this, &MainWindow::goToPosition);
+
     auto* toolsMenu = menuBar()->addMenu(tr("&Tools"));
     toolsMenu->addAction(tr("&Update Syntax Definitions"),
                          this, &MainWindow::updateSyntaxData);
@@ -97,6 +108,48 @@ MainWindow::MainWindow(QWidget* parent)
 
     // After the window is shown: offer the first download if needed.
     QTimer::singleShot(0, this, &MainWindow::offerSyntaxDownload);
+}
+
+void MainWindow::goToPosition()
+{
+    auto* tab = currentTab();
+    if (!tab) return;
+    auto* area = tab->editor()->area();
+    const auto cursor = area->cursorPosition();
+    const int lineCount = qMax(1, tab->document()->lineCount());
+    QInputDialog dialog(this);
+    dialog.setWindowTitle(tr("Go to Line/Column"));
+    dialog.setLabelText(tr("Line[:column] (1–%1):").arg(lineCount));
+    dialog.setInputMode(QInputDialog::TextInput);
+    dialog.setTextValue(QString("%1:%2").arg(cursor.line + 1).arg(cursor.column + 1));
+
+    auto position = [tab, lineCount](const QString& text) -> std::optional<qce::TextCursor> {
+        static const QRegularExpression pattern(QStringLiteral("^\\s*([1-9][0-9]*)\\s*(?::\\s*([1-9][0-9]*)\\s*)?$"));
+        const auto match = pattern.match(text);
+        if (!match.hasMatch()) return std::nullopt;
+        bool lineOk = false, columnOk = true;
+        const int line = match.captured(1).toInt(&lineOk);
+        const int column = match.captured(2).isEmpty() ? 1 : match.captured(2).toInt(&columnOk);
+        if (!lineOk || !columnOk || line > lineCount
+            || column > tab->document()->lineAt(line - 1).size() + 1)
+            return std::nullopt;
+        return qce::TextCursor{line - 1, column - 1};
+    };
+    auto validate = [&dialog, position]() {
+        if (auto* buttons = dialog.findChild<QDialogButtonBox*>())
+            buttons->button(QDialogButtonBox::Ok)->setEnabled(position(dialog.textValue()).has_value());
+    };
+    connect(&dialog, &QInputDialog::textValueChanged, &dialog, validate);
+    QTimer::singleShot(0, &dialog, [&dialog, validate]() {
+        if (auto* input = dialog.findChild<QLineEdit*>()) input->selectAll();
+        validate();
+    });
+    if (dialog.exec() != QDialog::Accepted) return;
+    if (const auto target = position(dialog.textValue())) {
+        tab->revealRange(*target, *target);
+        area->setCursorPosition(*target);
+        area->setFocus();
+    }
 }
 
 qce::kate::KateDataDownloader* MainWindow::downloader()

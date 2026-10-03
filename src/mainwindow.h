@@ -22,6 +22,7 @@ private slots:
     void openFileDialog();
     void saveFile();
     void saveFileAs();
+    void goToPosition();
     void onTabAboutToClose(QWidget* page, bool askPin, bool& allowClose);
     void onCurrentTabChanged(int index);
     void onModificationChanged(bool modified);

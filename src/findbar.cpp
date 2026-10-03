@@ -231,29 +231,7 @@ void FindBar::activate(int index)
     auto* area = m_tab->editor()->area();
     const auto start = positionFor(match.start);
     const auto end = positionFor(match.end);
-    auto& folds = area->foldState();
-    int refreshLine = -1;
-    const auto& regions = folds.regions();
-    for (int i = 0; i < regions.size(); ++i) {
-        if (!folds.isCollapsed(i)) continue;
-        const auto& region = regions[i];
-        const qce::TextCursor hiddenStart{region.startLine, region.startColumn};
-        // Folding hides the header suffix and every following line through
-        // endLine, including text after the closing marker on that line.
-        const bool overlaps = start.line <= region.endLine
-            && (start == end ? hiddenStart <= start : hiddenStart < end);
-        if (!overlaps) continue;
-        folds.setCollapsed(i, false);
-        refreshLine = region.startLine;
-    }
-    if (refreshLine >= 0) {
-        // The public toggle refreshes layout, scrollbars and the viewport.
-        // It addresses the first region on a line; invert that region first
-        // so the toggle restores its desired state, including same-line folds.
-        const int first = folds.regionStartingAt(refreshLine);
-        folds.setCollapsed(first, !folds.isCollapsed(first));
-        area->toggleFoldAt(refreshLine);
-    }
+    m_tab->revealRange(start, end);
     area->setSelection(start, end);
     updateHighlights();
 }

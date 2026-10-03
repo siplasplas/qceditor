@@ -67,3 +67,8 @@ Replacement respects selection-only search and can be undone in the editor.
 Navigating to a search result expands every collapsed fold hiding that result,
 including nested folds and folds intersecting a multiline match. Other folds
 keep their current state.
+
+Ctrl+G opens the standard Qt input dialog with the current one-based
+`line:column` selected. Enter `line:column` or just `line` (column 1).
+OK moves the cursor and reveals any folds hiding the destination; Cancel leaves
+the position unchanged. Invalid or out-of-range positions disable OK.

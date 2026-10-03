@@ -19,6 +19,7 @@ class EditorTab : public QWidget
 public:
     explicit EditorTab(QWidget* parent = nullptr);
 
+    void revealRange(qce::TextCursor start, qce::TextCursor end);
     void showSearch();
     void showReplace();
     void findNext(bool backwards = false);
