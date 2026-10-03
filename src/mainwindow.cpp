@@ -8,6 +8,12 @@
 #include <QMessageBox>
 #include <QCloseEvent>
 #include <QFileInfo>
+#include <QFile>
+#include <QDir>
+#include <QSaveFile>
+#include <QStandardPaths>
+#include <QJsonDocument>
+#include <QJsonArray>
 #include <QKeySequence>
 #include <QSettings>
 #include <QTimer>
@@ -22,6 +28,15 @@
 #include <qce/kate/KateDataDownloader.h>
 #include <qce/kate/KateSyntaxVersion.h>
 #include "syntaxdata.h"
+
+static constexpr int kRecentFilesLimit = 20;
+
+static QString normalizedFilePath(const QString& path)
+{
+    const QFileInfo file(path);
+    const QString canonical = file.canonicalFilePath();
+    return canonical.isEmpty() ? file.absoluteFilePath() : canonical;
+}
 
 static const char* kDeclinedKey = "syntaxData/declinedDownload";
 
@@ -52,6 +67,11 @@ MainWindow::MainWindow(QWidget* parent)
 
     addAction(tr("&New"),        QKeySequence::New,   &MainWindow::newFile);
     addAction(tr("&Open..."),    QKeySequence::Open,  &MainWindow::openFileDialog);
+    m_recentFilesMenu = fileMenu->addMenu(tr("Recent &Files"));
+    m_recentFilesMenu->setObjectName("recentFilesMenu");
+    loadRecentFiles();
+    updateRecentFilesMenu();
+    connect(m_recentFilesMenu, &QMenu::aboutToShow, this, &MainWindow::updateRecentFilesMenu);
     fileMenu->addSeparator();
     addAction(tr("&Save"),       QKeySequence::Save,  &MainWindow::saveFile);
     addAction(tr("Save &As..."), QKeySequence::SaveAs,&MainWindow::saveFileAs);
@@ -103,11 +123,84 @@ MainWindow::MainWindow(QWidget* parent)
 
     connect(m_tabs, &MruTabWidget::tabAboutToClose,
             this, &MainWindow::onTabAboutToClose, Qt::DirectConnection);
+    connect(m_tabs, &MruTabWidget::tabClosed, this, [this](QWidget* page) {
+        if (auto* tab = qobject_cast<EditorTab*>(page); tab && addRecentFile(tab->filePath())) {
+            updateRecentFilesMenu();
+            saveRecentFiles();
+        }
+    });
     connect(m_tabs, &QTabWidget::currentChanged,
             this, &MainWindow::onCurrentTabChanged);
 
     // After the window is shown: offer the first download if needed.
     QTimer::singleShot(0, this, &MainWindow::offerSyntaxDownload);
+}
+
+void MainWindow::loadRecentFiles()
+{
+    const QString root = QStandardPaths::writableLocation(QStandardPaths::GenericDataLocation);
+    if (root.isEmpty()) return;
+    m_configPath = QDir(root).filePath(QStringLiteral("qceditor/config.json"));
+    QFile file(m_configPath);
+    if (!file.exists()) return;
+    if (!file.open(QIODevice::ReadOnly)) {
+        statusBar()->showMessage(tr("Cannot read recent files: %1").arg(file.errorString()), 8000);
+        return;
+    }
+    QJsonParseError error;
+    const auto document = QJsonDocument::fromJson(file.readAll(), &error);
+    if (error.error != QJsonParseError::NoError || !document.isObject()) {
+        statusBar()->showMessage(tr("Cannot read recent files: invalid JSON in %1").arg(m_configPath), 8000);
+        return;
+    }
+    m_config = document.object();
+    for (const auto& entry : m_config.value(QStringLiteral("recentFiles")).toArray()) {
+        if (!entry.isString() || entry.toString().isEmpty()) continue;
+        const auto path = normalizedFilePath(entry.toString());
+        if (!m_recentFiles.contains(path)) m_recentFiles.append(path);
+        if (m_recentFiles.size() == kRecentFilesLimit) break;
+    }
+}
+
+void MainWindow::saveRecentFiles()
+{
+    if (m_configPath.isEmpty()) return;
+    m_config.insert(QStringLiteral("recentFiles"), QJsonArray::fromStringList(m_recentFiles));
+    if (!QDir().mkpath(QFileInfo(m_configPath).absolutePath())) {
+        statusBar()->showMessage(tr("Cannot create configuration directory: %1")
+                                .arg(QFileInfo(m_configPath).absolutePath()), 8000);
+        return;
+    }
+    QSaveFile file(m_configPath);
+    const auto json = QJsonDocument(m_config).toJson(QJsonDocument::Indented);
+    if (!file.open(QIODevice::WriteOnly) || file.write(json) != json.size() || !file.commit())
+        statusBar()->showMessage(tr("Cannot save recent files: %1").arg(file.errorString()), 8000);
+}
+
+bool MainWindow::addRecentFile(const QString& path)
+{
+    if (path.isEmpty()) return false;
+    const auto normalized = normalizedFilePath(path);
+    m_recentFiles.removeAll(normalized);
+    m_recentFiles.prepend(normalized);
+    while (m_recentFiles.size() > kRecentFilesLimit) m_recentFiles.removeLast();
+    return true;
+}
+
+void MainWindow::updateRecentFilesMenu()
+{
+    m_recentFilesMenu->clear();
+    if (m_recentFiles.isEmpty()) {
+        m_recentFilesMenu->addAction(tr("No recently closed files"))->setEnabled(false);
+        return;
+    }
+    for (const auto& path : m_recentFiles) {
+        auto* action = m_recentFilesMenu->addAction(QString(path).replace("&", "&&"));
+        action->setData(path);
+        action->setToolTip(path);
+        action->setEnabled(QFileInfo(path).isFile());
+        connect(action, &QAction::triggered, this, [this, path]() { openFile(path); });
+    }
 }
 
 void MainWindow::goToPosition()
@@ -257,11 +350,12 @@ void MainWindow::openFileDialog()
         openFile(path);
 }
 
-void MainWindow::openFile(const QString& path)
+void MainWindow::openFile(const QString& requestedPath)
 {
+    const QString path = normalizedFilePath(requestedPath);
     for (int i = 0; i < m_tabs->count(); ++i) {
         EditorTab* t = tabAt(i);
-        if (t && t->filePath() == path) {
+        if (t && !t->filePath().isEmpty() && normalizedFilePath(t->filePath()) == path) {
             m_tabs->setCurrentIndex(i);
             return;
         }
@@ -399,6 +493,19 @@ void MainWindow::closeEvent(QCloseEvent* event)
             event->ignore();
             return;
         }
+    }
+    // Record remaining files only after every save/close confirmation succeeded.
+    // Put the active file first when the whole window is closed.
+    bool changed = false;
+    auto* active = currentTab();
+    for (int i = 0; i < m_tabs->count(); ++i) {
+        auto* tab = tabAt(i);
+        if (tab && tab != active) changed |= addRecentFile(tab->filePath());
+    }
+    if (active) changed |= addRecentFile(active->filePath());
+    if (changed) {
+        updateRecentFilesMenu();
+        saveRecentFiles();
     }
     event->accept();
 }

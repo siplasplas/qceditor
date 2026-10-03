@@ -1,9 +1,12 @@
 #pragma once
 #include <QMainWindow>
+#include <QJsonObject>
+#include <QStringList>
 
 class MruTabWidget;
 class EditorTab;
 class QLabel;
+class QMenu;
 namespace qce::kate { class KateDataDownloader; }
 
 class MainWindow : public QMainWindow
@@ -37,7 +40,16 @@ private:
     bool       confirmClose(EditorTab* tab);
     bool       saveTabAs(EditorTab* tab);
     void       offerSyntaxDownload();
+    void       loadRecentFiles();
+    void       saveRecentFiles();
+    void       updateRecentFilesMenu();
+    bool       addRecentFile(const QString& path);
     qce::kate::KateDataDownloader* downloader();
+
+    QMenu* m_recentFilesMenu = nullptr;
+    QStringList m_recentFiles;
+    QString m_configPath;
+    QJsonObject m_config;
 
     MruTabWidget* m_tabs      = nullptr;
     QLabel*       m_statusPos = nullptr;

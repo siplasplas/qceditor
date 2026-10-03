@@ -72,3 +72,15 @@ Ctrl+G opens the standard Qt input dialog with the current one-based
 `line:column` selected. Enter `line:column` or just `line` (column 1).
 OK moves the cursor and reveals any folds hiding the destination; Cancel leaves
 the position unchanged. Invalid or out-of-range positions disable OK.
+
+**File > Recent Files** lists up to 20 recently closed files, newest first,
+without duplicates. Untitled documents and cancelled closes are not recorded.
+Closing the application records its remaining files, with the active file first.
+Selecting an entry reopens it (or activates its existing tab); missing files are
+shown disabled. Paths are normalized so relative paths and symlinks to the same
+file do not create duplicate entries.
+
+The list is saved atomically as `recentFiles` in a JSON `config.json` under
+`QStandardPaths::GenericDataLocation/qceditor`, normally
+`~/.local/share/qceditor/config.json` on Linux (honoring `XDG_DATA_HOME`).
+Other JSON configuration keys are preserved.
