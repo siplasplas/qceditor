@@ -8,6 +8,7 @@ set(CMAKE_AUTOUIC ON)
 set(CMAKE_AUTORCC ON)
 
 find_package(Qt6 6.2 REQUIRED COMPONENTS Core Gui Widgets)
+find_package(qt-extra 2 REQUIRED)
 find_package(qcodeedit REQUIRED)
 find_package(qcodeedit-kate REQUIRED)
 find_package(qcodeedit-katedata REQUIRED)
@@ -17,16 +18,12 @@ set(SOURCES
     src/mainwindow.cpp
     src/editortab.cpp
     src/syntaxdata.cpp
-    src/widgets/mrutabwidget.cpp
-    src/widgets/Ev.cpp
 )
 
 set(HEADERS
     src/mainwindow.h
     src/editortab.h
     src/syntaxdata.h
-    src/widgets/mrutabwidget.h
-    src/widgets/Ev.h
 )
 
 add_executable(qceditor ${SOURCES} ${HEADERS})
@@ -37,6 +34,7 @@ target_link_libraries(qceditor PRIVATE
     Qt6::Core
     Qt6::Gui
     Qt6::Widgets
+    qt-extra
     qcodeedit::qcodeedit
     qcodeedit::kate
     qcodeedit::katedata

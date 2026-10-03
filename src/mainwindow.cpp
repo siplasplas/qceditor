@@ -1,6 +1,6 @@
 #include "mainwindow.h"
 #include "editortab.h"
-#include "widgets/mrutabwidget.h"
+#include <mrutabwidget.h>
 #include <QMenuBar>
 #include <QStatusBar>
 #include <QLabel>
@@ -56,7 +56,7 @@ MainWindow::MainWindow(QWidget* parent)
         a->setShortcut(QKeySequence(Qt::CTRL | Qt::Key_W));
         connect(a, &QAction::triggered, this, [this]() {
             if (m_tabs->count() > 0)
-                m_tabs->requestCloseTab(m_tabs->currentIndex());
+                m_tabs->requestCloseTab(currentTab());
         });
         fileMenu->addAction(a);
     }
@@ -69,7 +69,7 @@ MainWindow::MainWindow(QWidget* parent)
                          this, &MainWindow::updateSyntaxData);
 
     connect(m_tabs, &MruTabWidget::tabAboutToClose,
-            this, &MainWindow::onTabAboutToClose);
+            this, &MainWindow::onTabAboutToClose, Qt::DirectConnection);
     connect(m_tabs, &QTabWidget::currentChanged,
             this, &MainWindow::onCurrentTabChanged);
 
@@ -151,8 +151,8 @@ EditorTab* MainWindow::createTab(const QString& title)
 {
     auto* tab = new EditorTab();
     QString label = title.isEmpty() ? tr("Untitled") : title;
-    int idx = m_tabs->addTab(tab, label);
-    m_tabs->setCurrentIndex(idx);
+    m_tabs->addTab(tab, label);
+    m_tabs->setCurrentWidget(tab);
 
     connect(tab, &EditorTab::modificationChanged,
             this, &MainWindow::onModificationChanged);
@@ -196,7 +196,7 @@ void MainWindow::openFile(const QString& path)
     if (!tab->loadFile(path)) {
         QMessageBox::critical(this, tr("Error"),
                               tr("Cannot open file:\n%1").arg(path));
-        m_tabs->requestCloseTab(m_tabs->indexOf(tab));
+        m_tabs->requestCloseTab(tab);
         return;
     }
 
@@ -224,17 +224,21 @@ void MainWindow::saveFile()
 
 void MainWindow::saveFileAs()
 {
-    EditorTab* tab = currentTab();
-    if (!tab) return;
+    saveTabAs(currentTab());
+}
+
+bool MainWindow::saveTabAs(EditorTab* tab)
+{
+    if (!tab) return false;
 
     QString path = QFileDialog::getSaveFileName(
         this, tr("Save File As"), tab->filePath(), tr("All Files (*)"));
-    if (path.isEmpty()) return;
+    if (path.isEmpty()) return false;
 
     if (!tab->saveAs(path)) {
         QMessageBox::critical(this, tr("Error"),
                               tr("Cannot save file:\n%1").arg(path));
-        return;
+        return false;
     }
 
     QString name = QFileInfo(path).fileName();
@@ -242,6 +246,7 @@ void MainWindow::saveFileAs()
     m_tabs->setTabText(idx, name);
     m_tabs->setTabToolTip(idx, path);
     updateWindowTitle();
+    return true;
 }
 
 bool MainWindow::confirmClose(EditorTab* tab)
@@ -260,17 +265,17 @@ bool MainWindow::confirmClose(EditorTab* tab)
 
     if (answer == QMessageBox::Save) {
         if (tab->filePath().isEmpty()) {
-            saveFileAs();
-            return !tab->isModified();
+            return saveTabAs(tab);
         }
         return tab->save();
     }
     return answer == QMessageBox::Discard;
 }
 
-void MainWindow::onTabAboutToClose(int index, bool /*askPin*/, bool& allowClose)
+void MainWindow::onTabAboutToClose(QWidget* page, bool /*askPin*/, bool& allowClose)
 {
-    allowClose = confirmClose(tabAt(index));
+    if (allowClose)
+        allowClose = confirmClose(qobject_cast<EditorTab*>(page));
 }
 
 void MainWindow::onCurrentTabChanged(int index)

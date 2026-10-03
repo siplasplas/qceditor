@@ -22,7 +22,7 @@ private slots:
     void openFileDialog();
     void saveFile();
     void saveFileAs();
-    void onTabAboutToClose(int index, bool askPin, bool& allowClose);
+    void onTabAboutToClose(QWidget* page, bool askPin, bool& allowClose);
     void onCurrentTabChanged(int index);
     void onModificationChanged(bool modified);
     void updateSyntaxData();
@@ -34,6 +34,7 @@ private:
     void       updateWindowTitle();
     void       updateStatusBar(EditorTab* tab);
     bool       confirmClose(EditorTab* tab);
+    bool       saveTabAs(EditorTab* tab);
     void       offerSyntaxDownload();
     qce::kate::KateDataDownloader* downloader();
 
