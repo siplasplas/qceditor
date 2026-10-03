@@ -6,53 +6,15 @@
 #include <QDir>
 #include <qce/CodeEditArea.h>
 #include <qce/FoldState.h>
+#include <qce/kate/KateTheme.h>
 #include <qce/kate/KateXmlReader.h>
+#include "syntaxdata.h"
 
-static QString syntaxFileForExtension(const QString& ext)
-{
-    static const QMap<QString, QString> map = {
-        {"c",   "c"},    {"cpp","cpp"},  {"cxx","cpp"},  {"cc","cpp"},
-        {"h",   "cpp"},  {"hpp","cpp"},  {"hxx","cpp"},
-        {"py",  "python"},
-        {"js",  "javascript"},
-        {"ts",  "typescript"},
-        {"java","java"},
-        {"xml", "xml"},  {"html","html"}, {"htm","html"},
-        {"css", "css"},
-        {"sh",  "bash"},
-        {"cmake","cmake"},
-        {"md",  "markdown"},
-        {"json","json"},
-        {"rs",  "rust"},
-        {"go",  "go"},
-    };
-    return map.value(ext.toLower());
-}
-
+// Used only when no Kate definition matches (e.g. data not downloaded yet).
 static bool isCppExtension(const QString& ext)
 {
     static const QStringList cpp = {"c","cpp","cxx","cc","h","hpp","hxx"};
     return cpp.contains(ext.toLower());
-}
-
-static QStringList kateSyntaxSearchDirs()
-{
-    return {
-        QDir::homePath() + "/.local/share/org.kde.syntax-highlighting/syntax",
-        "/usr/share/katepart5/syntax",
-        "/usr/share/kde4/apps/katepart/syntax",
-        "/usr/share/ktexteditor5/syntax",
-    };
-}
-
-static QString findKateXml(const QString& syntaxName)
-{
-    for (const QString& dir : kateSyntaxSearchDirs()) {
-        QString path = dir + "/" + syntaxName + ".xml";
-        if (QFile::exists(path))
-            return path;
-    }
-    return {};
 }
 
 EditorTab::EditorTab(QWidget* parent)
@@ -136,31 +98,34 @@ bool EditorTab::saveAs(const QString& path)
     out.setEncoding(QStringConverter::Utf8);
     out << m_doc->toPlainText();
 
+    const bool renamed = path != m_filePath;
     m_filePath = path;
     m_modified = false;
     emit modificationChanged(false);
+    if (renamed)
+        applyHighlighterForFile(path);
     return true;
+}
+
+void EditorTab::reapplyHighlighter()
+{
+    if (!m_filePath.isEmpty())
+        applyHighlighterForFile(m_filePath);
 }
 
 void EditorTab::applyHighlighterForFile(const QString& path)
 {
-    QString ext        = QFileInfo(path).suffix().toLower();
-    QString syntaxName = syntaxFileForExtension(ext);
-
-    if (syntaxName.isEmpty()) {
-        clearHighlighter();
+    // Kate definitions downloaded by qcodeedit, matched by file name and
+    // sorted by priority (definitions needing a newer Kate are skipped).
+    const auto& index   = SyntaxData::index();
+    const auto  matches = index.forFileName(path);
+    if (!matches.isEmpty()) {
+        applyKateHighlighter(index.filePath(*matches.first()));
         return;
     }
 
-    QString xmlPath = findKateXml(syntaxName);
-
-    if (!xmlPath.isEmpty()) {
-        applyKateHighlighter(xmlPath);
-        return;
-    }
-
-    // No Kate XML found — fall back to built-in programmatic highlighter for C/C++
-    if (isCppExtension(ext)) {
+    // No Kate definition — fall back to built-in programmatic highlighter for C/C++
+    if (isCppExtension(QFileInfo(path).suffix())) {
         applyCppHighlighter();
         return;
     }
@@ -302,7 +267,8 @@ void EditorTab::applyCppHighlighter()
 
 void EditorTab::applyKateHighlighter(const QString& xmlPath)
 {
-    auto hl = KateXmlReader::load(xmlPath);
+    // ##Lang includes (e.g. Doxygen inside C++) are resolved through the index.
+    auto hl = KateXmlReader::load(xmlPath, KateTheme{}, SyntaxData::index());
     if (!hl) { clearHighlighter(); return; }
 
     m_highlighter = std::move(hl);

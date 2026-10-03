@@ -4,6 +4,7 @@
 class MruTabWidget;
 class EditorTab;
 class QLabel;
+namespace qce::kate { class KateDataDownloader; }
 
 class MainWindow : public QMainWindow
 {
@@ -24,6 +25,7 @@ private slots:
     void onTabAboutToClose(int index, bool askPin, bool& allowClose);
     void onCurrentTabChanged(int index);
     void onModificationChanged(bool modified);
+    void updateSyntaxData();
 
 private:
     EditorTab* currentTab() const;
@@ -32,7 +34,10 @@ private:
     void       updateWindowTitle();
     void       updateStatusBar(EditorTab* tab);
     bool       confirmClose(EditorTab* tab);
+    void       offerSyntaxDownload();
+    qce::kate::KateDataDownloader* downloader();
 
     MruTabWidget* m_tabs      = nullptr;
     QLabel*       m_statusPos = nullptr;
+    qce::kate::KateDataDownloader* m_downloader = nullptr;
 };

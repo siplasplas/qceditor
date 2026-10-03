@@ -9,8 +9,15 @@
 #include <QCloseEvent>
 #include <QFileInfo>
 #include <QKeySequence>
+#include <QSettings>
+#include <QTimer>
 #include <qce/CodeEditArea.h>
 #include <qce/TextCursor.h>
+#include <qce/kate/KateDataDownloader.h>
+#include <qce/kate/KateSyntaxVersion.h>
+#include "syntaxdata.h"
+
+static const char* kDeclinedKey = "syntaxData/declinedDownload";
 
 MainWindow::MainWindow(QWidget* parent)
     : QMainWindow(parent)
@@ -57,10 +64,75 @@ MainWindow::MainWindow(QWidget* parent)
     fileMenu->addSeparator();
     addAction(tr("E&xit"), QKeySequence::Quit, &MainWindow::close);
 
+    auto* toolsMenu = menuBar()->addMenu(tr("&Tools"));
+    toolsMenu->addAction(tr("&Update Syntax Definitions"),
+                         this, &MainWindow::updateSyntaxData);
+
     connect(m_tabs, &MruTabWidget::tabAboutToClose,
             this, &MainWindow::onTabAboutToClose);
     connect(m_tabs, &QTabWidget::currentChanged,
             this, &MainWindow::onCurrentTabChanged);
+
+    // After the window is shown: offer the first download if needed.
+    QTimer::singleShot(0, this, &MainWindow::offerSyntaxDownload);
+}
+
+qce::kate::KateDataDownloader* MainWindow::downloader()
+{
+    if (m_downloader)
+        return m_downloader;
+
+    m_downloader = new qce::kate::KateDataDownloader(this);
+    connect(m_downloader, &qce::kate::KateDataDownloader::progress,
+            this, [this](int done, int total) {
+        statusBar()->showMessage(tr("Downloading syntax definitions: %1/%2").arg(done).arg(total));
+    });
+    connect(m_downloader, &qce::kate::KateDataDownloader::finished,
+            this, [this](bool ok, int downloaded, int failed) {
+        SyntaxData::reload();
+        for (int i = 0; i < m_tabs->count(); ++i)
+            if (EditorTab* t = tabAt(i))
+                t->reapplyHighlighter();
+        statusBar()->showMessage(
+            ok ? tr("Syntax definitions up to date (%1 files downloaded)").arg(downloaded)
+               : tr("Syntax definitions incomplete: %1 downloaded, %2 failed")
+                     .arg(downloaded).arg(failed),
+            8000);
+    });
+    return m_downloader;
+}
+
+// Ask once on startup when no (complete) data set is present. A "No" is
+// remembered; Tools > Update Syntax Definitions stays available.
+void MainWindow::offerSyntaxDownload()
+{
+    if (!downloader()->mustDownload())
+        return;
+    QSettings settings;
+    if (settings.value(kDeclinedKey, false).toBool())
+        return;
+
+    const auto answer = QMessageBox::question(
+        this, tr("Syntax Definitions"),
+        tr("Download Kate syntax definitions %1 and color themes from "
+           "kate-editor.org and invent.kde.org?\n\nThey will be stored in:\n%2")
+            .arg(qce::kate::supportedSyntaxVersion().toString(),
+                 downloader()->dataDir()),
+        QMessageBox::Yes | QMessageBox::No, QMessageBox::Yes);
+    if (answer != QMessageBox::Yes) {
+        settings.setValue(kDeclinedKey, true);
+        return;
+    }
+    updateSyntaxData();
+}
+
+void MainWindow::updateSyntaxData()
+{
+    QSettings().remove(kDeclinedKey);
+    if (downloader()->busy())
+        return;
+    statusBar()->showMessage(tr("Downloading syntax definitions…"));
+    downloader()->start();
 }
 
 EditorTab* MainWindow::currentTab() const

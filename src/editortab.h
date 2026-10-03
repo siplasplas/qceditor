@@ -23,6 +23,10 @@ public:
     QString filePath() const { return m_filePath; }
     bool    isModified() const { return m_modified; }
 
+    /// Pick the highlighter again for the current file (e.g. after the Kate
+    /// syntax data has been downloaded or updated).
+    void reapplyHighlighter();
+
     qce::CodeEdit*           editor()   { return m_edit; }
     qce::SimpleTextDocument* document() { return m_doc; }
 
