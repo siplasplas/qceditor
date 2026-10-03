@@ -33,3 +33,13 @@ Tabs support reordering, pinning, Ctrl+Tab MRU navigation and bulk closing.
 The unpinned tab limit is 20. Closing a modified tab asks whether to save
 that document, including when it is not the active tab. qt-extra 2.x keeps
 tab state attached to the page when tabs move and provides a built-in pin icon.
+
+Right-click in the editor and choose **Syntax > section > language** to select
+a Kate syntax definition for that tab. Sections come from the syntax index.
+**Automatic** restores file-name detection; **Plain Text** disables highlighting.
+Manual selection survives Save As and syntax-definition updates for the open tab.
+
+**Theme** in the same context menu selects a downloaded Kate color theme for
+the current tab, including syntax colors, editor background and normal text.
+**Default** restores the original palette. Theme selection survives syntax
+changes, Save As and definition updates for the open tab.

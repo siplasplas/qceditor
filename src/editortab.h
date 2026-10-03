@@ -1,5 +1,7 @@
 #pragma once
 #include <QWidget>
+#include <QPalette>
+#include <qce/kate/KateTheme.h>
 #include <memory>
 #include <qce/CodeEdit.h>
 #include <qce/SimpleTextDocument.h>
@@ -35,9 +37,12 @@ signals:
 
 private:
     void onDocumentChanged();
+    void showContextMenu(const QPoint& position);
+    void applyThemePalette();
+    qce::TextAttribute themedAttribute(const QString& style, const qce::TextAttribute& fallback) const;
     void applyHighlighterForFile(const QString& path);
     void applyCppHighlighter();
-    void applyKateHighlighter(const QString& xmlPath);
+    bool applyKateHighlighter(const QString& xmlPath);
     void clearHighlighter();
 
     qce::SimpleTextDocument*                    m_doc          = nullptr;
@@ -46,6 +51,13 @@ private:
     std::unique_ptr<qce::FoldingGutter>         m_foldGutter;
     std::unique_ptr<qce::RulesHighlighter>      m_highlighter;
     std::unique_ptr<qce::RuleBasedFoldingProvider> m_foldProvider;
+
+    enum class SyntaxMode { Automatic, PlainText, Manual };
+    SyntaxMode m_syntaxMode = SyntaxMode::Automatic;
+    QString m_syntaxFile;
+    QString m_themeFile;
+    KateTheme m_theme;
+    QPalette m_defaultPalette;
 
     QString m_filePath;
     bool    m_modified = false;

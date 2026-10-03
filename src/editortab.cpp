@@ -4,9 +4,15 @@
 #include <QTextStream>
 #include <QFileInfo>
 #include <QDir>
+#include <QMenu>
+#include <QActionGroup>
+#include <QMap>
+#include <QMessageBox>
+#include <algorithm>
 #include <qce/CodeEditArea.h>
 #include <qce/FoldState.h>
 #include <qce/kate/KateTheme.h>
+#include <qce/kate/KatePaths.h>
 #include <qce/kate/KateXmlReader.h>
 #include "syntaxdata.h"
 
@@ -23,6 +29,10 @@ EditorTab::EditorTab(QWidget* parent)
     m_doc  = new qce::SimpleTextDocument(this);
     m_edit = new qce::CodeEdit(this);
     m_edit->setDocument(m_doc);
+    m_defaultPalette = m_edit->area()->palette();
+    m_edit->area()->setContextMenuPolicy(Qt::CustomContextMenu);
+    connect(m_edit->area(), &QWidget::customContextMenuRequested,
+            this, &EditorTab::showContextMenu);
 
     m_lineNumbers = std::make_unique<qce::LineNumberGutter>(m_doc);
     m_lineNumbers->setFont(m_edit->area()->font());
@@ -45,6 +55,108 @@ EditorTab::EditorTab(QWidget* parent)
             this, &EditorTab::onDocumentChanged);
     connect(m_doc, &qce::SimpleTextDocument::linesRemoved,
             this, &EditorTab::onDocumentChanged);
+}
+
+void EditorTab::showContextMenu(const QPoint& position)
+{
+    QMenu menu(this);
+    auto* syntaxMenu = menu.addMenu(tr("Syntax"));
+    auto* choices = new QActionGroup(&menu);
+    choices->setExclusive(true);
+
+    auto addChoice = [choices](QMenu* parent, const QString& text, bool checked) {
+        auto* action = parent->addAction(text);
+        action->setCheckable(true);
+        action->setChecked(checked);
+        choices->addAction(action);
+        return action;
+    };
+
+    auto* automatic = addChoice(syntaxMenu, tr("Automatic"),
+                                m_syntaxMode == SyntaxMode::Automatic);
+    connect(automatic, &QAction::triggered, this, [this]() {
+        m_syntaxMode = SyntaxMode::Automatic;
+        m_syntaxFile.clear();
+        reapplyHighlighter();
+    });
+    auto* plainText = addChoice(syntaxMenu, tr("Plain Text"),
+                                m_syntaxMode == SyntaxMode::PlainText);
+    connect(plainText, &QAction::triggered, this, [this]() {
+        m_syntaxMode = SyntaxMode::PlainText;
+        m_syntaxFile.clear();
+        reapplyHighlighter();
+    });
+    syntaxMenu->addSeparator();
+
+    QMap<QString, QList<qce::kate::LanguageEntry>> sections;
+    for (const auto& entry : SyntaxData::index().languages()) {
+        if (entry.hidden || entry.unsupported)
+            continue;
+        sections[entry.section.isEmpty() ? tr("Other") : entry.section].append(entry);
+    }
+    auto sectionNames = sections.keys();
+    std::sort(sectionNames.begin(), sectionNames.end(), [](const QString& a, const QString& b) {
+        return QString::localeAwareCompare(a, b) < 0;
+    });
+    for (const auto& section : sectionNames) {
+        // Index names are literal labels, not Qt mnemonic strings.
+        auto* group = syntaxMenu->addMenu(QString(section).replace("&", "&&"));
+        auto& entries = sections[section];
+        std::sort(entries.begin(), entries.end(), [](const auto& a, const auto& b) {
+            return QString::localeAwareCompare(a.name, b.name) < 0;
+        });
+        for (const auto& entry : entries) {
+            auto* action = addChoice(group, QString(entry.name).replace("&", "&&"),
+                m_syntaxMode == SyntaxMode::Manual && m_syntaxFile == entry.file);
+            connect(action, &QAction::triggered, this, [this, file = entry.file]() {
+                const auto& index = SyntaxData::index();
+                const auto* language = index.byFile(file);
+                if (!language || language->unsupported
+                    || !applyKateHighlighter(index.filePath(*language))) {
+                    QMessageBox::warning(this, tr("Syntax"),
+                                         tr("Cannot load syntax definition: %1").arg(file));
+                    return;
+                }
+                m_syntaxMode = SyntaxMode::Manual;
+                m_syntaxFile = file;
+            });
+        }
+    }
+    if (sections.isEmpty())
+        syntaxMenu->addAction(tr("No syntax definitions installed"))->setEnabled(false);
+
+    auto* themeMenu = menu.addMenu(tr("Theme"));
+    auto* themeChoices = new QActionGroup(&menu);
+    themeChoices->setExclusive(true);
+    auto addTheme = [&](const QString& name, const QString& path) {
+        auto* action = themeMenu->addAction(QString(name).replace("&", "&&"));
+        action->setCheckable(true);
+        action->setChecked(m_themeFile == path);
+        themeChoices->addAction(action);
+        connect(action, &QAction::triggered, this, [this, path]() {
+            KateTheme theme;
+            if (!path.isEmpty()) {
+                theme = KateTheme::load(path);
+                if (!theme.isValid()) {
+                    QMessageBox::warning(this, tr("Theme"),
+                                         tr("Cannot load theme: %1").arg(path));
+                    return;
+                }
+            }
+            m_themeFile = path;
+            m_theme = theme;
+            reapplyHighlighter();
+        });
+    };
+    addTheme(tr("Default"), QString());
+    themeMenu->addSeparator();
+    const auto themes = KateTheme::listThemes(qce::kate::themesDir());
+    for (const auto& theme : themes)
+        addTheme(theme.first, theme.second);
+    if (themes.isEmpty())
+        themeMenu->addAction(tr("No themes installed"))->setEnabled(false);
+
+    menu.exec(m_edit->area()->viewport()->mapToGlobal(position));
 }
 
 void EditorTab::onDocumentChanged()
@@ -77,7 +189,9 @@ bool EditorTab::loadFile(const QString& path)
     connect(m_doc, &qce::SimpleTextDocument::linesRemoved,
             this, &EditorTab::onDocumentChanged);
 
-    applyHighlighterForFile(path);
+    m_syntaxMode = SyntaxMode::Automatic;
+    m_syntaxFile.clear();
+    reapplyHighlighter();
     return true;
 }
 
@@ -103,14 +217,56 @@ bool EditorTab::saveAs(const QString& path)
     m_modified = false;
     emit modificationChanged(false);
     if (renamed)
-        applyHighlighterForFile(path);
+        reapplyHighlighter();
     return true;
+}
+
+void EditorTab::applyThemePalette()
+{
+    QPalette palette = m_defaultPalette;
+    if (m_theme.editorBackground.isValid()) {
+        palette.setColor(QPalette::Base, m_theme.editorBackground);
+        palette.setColor(QPalette::Window, m_theme.editorBackground);
+    }
+    const auto normal = m_theme.styles.constFind(QStringLiteral("Normal"));
+    if (normal != m_theme.styles.constEnd() && normal->fg.isValid()) {
+        palette.setColor(QPalette::Text, normal->fg);
+        palette.setColor(QPalette::WindowText, normal->fg);
+    }
+    m_edit->setPalette(palette);
+    m_edit->area()->setPalette(palette);
+    m_edit->area()->viewport()->setPalette(palette);
+    m_edit->area()->viewport()->update();
+}
+
+qce::TextAttribute EditorTab::themedAttribute(const QString& style,
+                                             const qce::TextAttribute& fallback) const
+{
+    const auto entry = m_theme.styles.constFind(style);
+    if (entry == m_theme.styles.constEnd())
+        return fallback;
+    return {entry->fg.isValid() ? entry->fg : fallback.foreground,
+            entry->bg, entry->bold, entry->italic, entry->underline};
 }
 
 void EditorTab::reapplyHighlighter()
 {
-    if (!m_filePath.isEmpty())
+    if (!m_themeFile.isEmpty()) {
+        const auto theme = KateTheme::load(m_themeFile);
+        if (theme.isValid())
+            m_theme = theme;
+    }
+    applyThemePalette();
+    if (m_syntaxMode == SyntaxMode::PlainText) {
+        clearHighlighter();
+    } else if (m_syntaxMode == SyntaxMode::Manual) {
+        const auto& index = SyntaxData::index();
+        const auto* entry = index.byFile(m_syntaxFile);
+        if (!entry || entry->unsupported || !applyKateHighlighter(index.filePath(*entry)))
+            clearHighlighter();
+    } else {
         applyHighlighterForFile(m_filePath);
+    }
 }
 
 void EditorTab::applyHighlighterForFile(const QString& path)
@@ -120,7 +276,8 @@ void EditorTab::applyHighlighterForFile(const QString& path)
     const auto& index   = SyntaxData::index();
     const auto  matches = index.forFileName(path);
     if (!matches.isEmpty()) {
-        applyKateHighlighter(index.filePath(*matches.first()));
+        if (!applyKateHighlighter(index.filePath(*matches.first())))
+            clearHighlighter();
         return;
     }
 
@@ -139,12 +296,12 @@ void EditorTab::applyCppHighlighter()
 
     auto hl = std::make_unique<RulesHighlighter>();
 
-    const int attrKw      = hl->addAttribute({QColor(0x00,0x00,0xAA), {}, true});
-    const int attrType    = hl->addAttribute({QColor(0x00,0x80,0x80), {}, true});
-    const int attrString  = hl->addAttribute({QColor(0xC0,0x10,0x10)});
-    const int attrComment = hl->addAttribute({QColor(0x80,0x80,0x80), {}, false, true});
-    const int attrNumber  = hl->addAttribute({QColor(0x80,0x40,0x00)});
-    const int attrPP      = hl->addAttribute({QColor(0x60,0x00,0x80)});
+    const int attrKw      = hl->addAttribute(themedAttribute(QStringLiteral("Keyword"), {QColor(0x00,0x00,0xAA), {}, true}));
+    const int attrType    = hl->addAttribute(themedAttribute(QStringLiteral("DataType"), {QColor(0x00,0x80,0x80), {}, true}));
+    const int attrString  = hl->addAttribute(themedAttribute(QStringLiteral("String"), {QColor(0xC0,0x10,0x10)}));
+    const int attrComment = hl->addAttribute(themedAttribute(QStringLiteral("Comment"), {QColor(0x80,0x80,0x80), {}, false, true}));
+    const int attrNumber  = hl->addAttribute(themedAttribute(QStringLiteral("DecVal"), {QColor(0x80,0x40,0x00)}));
+    const int attrPP      = hl->addAttribute(themedAttribute(QStringLiteral("Preprocessor"), {QColor(0x60,0x00,0x80)}));
 
     const int klKeywords = hl->addKeywordList({"keywords", {
         "if","else","return","for","while","do","break","continue",
@@ -265,11 +422,11 @@ void EditorTab::applyCppHighlighter()
     m_edit->area()->setWordWrap(true); // fold gutter requires wrap mode to render arrows
 }
 
-void EditorTab::applyKateHighlighter(const QString& xmlPath)
+bool EditorTab::applyKateHighlighter(const QString& xmlPath)
 {
     // ##Lang includes (e.g. Doxygen inside C++) are resolved through the index.
-    auto hl = KateXmlReader::load(xmlPath, KateTheme{}, SyntaxData::index());
-    if (!hl) { clearHighlighter(); return; }
+    auto hl = KateXmlReader::load(xmlPath, m_theme, SyntaxData::index());
+    if (!hl) return false;
 
     m_highlighter = std::move(hl);
     m_edit->area()->setHighlighter(m_highlighter.get());
@@ -284,6 +441,7 @@ void EditorTab::applyKateHighlighter(const QString& xmlPath)
     m_foldProvider->setPlaceholderFor("Region1", "//BEGIN…END");
     m_edit->area()->setFoldingProvider(m_foldProvider.get());
     m_edit->area()->setWordWrap(true); // fold gutter requires wrap mode to render arrows
+    return true;
 }
 
 void EditorTab::clearHighlighter()
