@@ -63,3 +63,7 @@ all included results in one undo step. **Exclude** skips the active result until
 the query/options or document change. **Aa** preserves upper/lower/title case.
 Regex replacements support `$1`, `\1`, `${name}`, and `\n`/`\t` escapes.
 Replacement respects selection-only search and can be undone in the editor.
+
+Navigating to a search result expands every collapsed fold hiding that result,
+including nested folds and folds intersecting a multiline match. Other folds
+keep their current state.
