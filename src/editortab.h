@@ -20,6 +20,7 @@ public:
     explicit EditorTab(QWidget* parent = nullptr);
 
     void showSearch();
+    void showReplace();
     void findNext(bool backwards = false);
 
     bool loadFile(const QString& path);

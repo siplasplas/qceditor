@@ -66,6 +66,11 @@ void EditorTab::showSearch()
     m_findBar->showSearch();
 }
 
+void EditorTab::showReplace()
+{
+    m_findBar->showReplace();
+}
+
 void EditorTab::findNext(bool backwards)
 {
     m_findBar->findNext(backwards);

@@ -1,7 +1,11 @@
 #include "findbar.h"
 #include "editortab.h"
+#include "replacecommand.h"
 #include <qce/CodeEditArea.h>
 #include <QHBoxLayout>
+#include <QVBoxLayout>
+#include <QPushButton>
+#include <QUndoStack>
 #include <QLineEdit>
 #include <QLabel>
 #include <QToolButton>
@@ -16,14 +20,22 @@ FindBar::FindBar(EditorTab* tab) : QWidget(tab), m_tab(tab)
 {
     setObjectName("findBar");
     tab->editor()->area()->installEventFilter(this);
-    auto* layout = new QHBoxLayout(this);
-    layout->setContentsMargins(8, 6, 8, 6);
+    auto* rows = new QVBoxLayout(this);
+    rows->setContentsMargins(8, 6, 8, 6);
+    rows->setSpacing(4);
+    auto* layout = new QHBoxLayout;
+    rows->addLayout(layout);
+    layout->setContentsMargins(0, 0, 0, 0);
     layout->setSpacing(5);
     auto button = [this](const QString& text, const QString& tip, bool toggle = false) {
         auto* b = new QToolButton(this);
         b->setText(text); b->setToolTip(tip); b->setAutoRaise(true); b->setCheckable(toggle);
         return b;
     };
+    m_expand = button(QString(), tr("Show/hide Replace"), true);
+    m_expand->setObjectName("replaceToggle");
+    m_expand->setIcon(style()->standardIcon(QStyle::SP_ArrowRight));
+    layout->addWidget(m_expand);
     auto* field = new QWidget(this);
     field->setObjectName("findField");
     field->setStyleSheet("#findField { border: 1px solid palette(mid); border-radius: 3px; background: palette(base); }");
@@ -54,12 +66,44 @@ FindBar::FindBar(EditorTab* tab) : QWidget(tab), m_tab(tab)
     layout->addStretch();
     auto* close = button(QString(), tr("Close search (Escape)"));
     close->setIcon(style()->standardIcon(QStyle::SP_DialogCloseButton)); layout->addWidget(close);
+    m_replaceRow = new QWidget(this);
+    m_replaceRow->setObjectName("replaceRow");
+    auto* replaceLayout = new QHBoxLayout(m_replaceRow);
+    replaceLayout->setContentsMargins(0, 0, 0, 0); replaceLayout->setSpacing(5);
+    replaceLayout->addSpacing(m_expand->sizeHint().width() + layout->spacing());
+    auto* replaceField = new QWidget(m_replaceRow);
+    replaceField->setObjectName("replaceField");
+    replaceField->setStyleSheet("#replaceField { border: 1px solid palette(mid); border-radius: 3px; background: palette(base); }");
+    auto* replacementLayout = new QHBoxLayout(replaceField);
+    replacementLayout->setContentsMargins(5, 1, 3, 1); replacementLayout->setSpacing(1);
+    replacementLayout->addWidget(new QLabel(QString::fromUtf8("⌕"), replaceField));
+    m_replacement = new QLineEdit(replaceField);
+    m_replacement->setObjectName("replaceText"); m_replacement->setFrame(false);
+    m_replacement->setClearButtonEnabled(true); m_replacement->setPlaceholderText(tr("Replace with"));
+    replacementLayout->addWidget(m_replacement, 1);
+    m_preserveCase = button("Aa", tr("Preserve case"), true);
+    replacementLayout->addWidget(m_preserveCase);
+    replaceField->setMinimumWidth(260); replaceField->setMaximumWidth(360);
+    replaceLayout->addWidget(replaceField, 1);
+    m_replace = new QPushButton(tr("Replace"), m_replaceRow); m_replace->setObjectName("replaceCurrent");
+    m_replaceAll = new QPushButton(tr("Replace All"), m_replaceRow); m_replaceAll->setObjectName("replaceAll");
+    m_exclude = new QPushButton(tr("Exclude"), m_replaceRow); m_exclude->setObjectName("excludeMatch");
+    replaceLayout->addWidget(m_replace); replaceLayout->addWidget(m_replaceAll); replaceLayout->addWidget(m_exclude);
+    replaceLayout->addStretch(); rows->addWidget(m_replaceRow); m_replaceRow->hide();
+    connect(m_expand, &QToolButton::toggled, this, [this](bool expanded) {
+        m_replaceRow->setVisible(expanded);
+        m_expand->setIcon(style()->standardIcon(expanded ? QStyle::SP_ArrowDown : QStyle::SP_ArrowRight));
+    });
+    connect(m_replace, &QPushButton::clicked, this, &FindBar::replaceCurrent);
+    connect(m_replaceAll, &QPushButton::clicked, this, &FindBar::replaceAll);
+    connect(m_exclude, &QPushButton::clicked, this, &FindBar::excludeCurrent);
+    connect(m_replacement, &QLineEdit::returnPressed, this, &FindBar::replaceCurrent);
     connect(close, &QToolButton::clicked, this, &FindBar::closeSearch);
     connect(m_previous, &QToolButton::clicked, this, [this]() { findNext(true); });
     connect(m_next, &QToolButton::clicked, this, [this]() { findNext(); });
-    connect(m_query, &QLineEdit::textChanged, this, [this]() { rebuild(); });
+    connect(m_query, &QLineEdit::textChanged, this, [this]() { m_excluded.clear(); rebuild(); });
     connect(m_query, &QLineEdit::returnPressed, this, [this]() { findNext(); });
-    for (auto* b : {m_case, m_words, m_regex}) connect(b, &QToolButton::toggled, this, [this]() { rebuild(); });
+    for (auto* b : {m_case, m_words, m_regex}) connect(b, &QToolButton::toggled, this, [this]() { m_excluded.clear(); rebuild(); });
     connect(m_scope, &QToolButton::toggled, this, [this](bool enabled) {
         if (enabled) {
             auto* area = m_tab->editor()->area();
@@ -84,6 +128,7 @@ FindBar::FindBar(EditorTab* tab) : QWidget(tab), m_tab(tab)
     connect(doc, &qce::ITextDocument::linesInserted, this, [this]() { rebuild(false); });
     connect(doc, &qce::ITextDocument::linesRemoved, this, [this]() { rebuild(false); });
     connect(doc, &qce::ITextDocument::documentReset, this, [this]() { rebuild(false); });
+    m_snapshot = doc->toPlainText();
     hide();
 }
 FindBar::~FindBar() = default;
@@ -99,6 +144,7 @@ void FindBar::showSearch()
 {
     auto* area = m_tab->editor()->area();
     const auto selection = area->selectedText();
+    const bool wasHidden = isHidden();
     // Capture the user's scope before navigation selects the first result.
     if (isHidden() && !m_scope->isChecked()) {
         m_scopeAvailable = area->hasSelection();
@@ -108,9 +154,16 @@ void FindBar::showSearch()
         }
     }
     show();
-    if (!selection.isEmpty() && !selection.contains('\n')) m_query->setText(selection);
+    if (wasHidden && !selection.isEmpty() && !selection.contains('\n')) m_query->setText(selection);
     rebuild(); m_query->setFocus(); m_query->selectAll();
 }
+void FindBar::showReplace()
+{
+    showSearch();
+    m_expand->setChecked(true);
+    m_replacement->setFocus(); m_replacement->selectAll();
+}
+
 int FindBar::offsetFor(qce::TextCursor cursor) const
 {
     int offset = cursor.column;
@@ -131,8 +184,10 @@ qce::TextCursor FindBar::positionFor(int offset) const
 }
 void FindBar::rebuild(bool moveCursor)
 {
+    if (m_replacing) return;
     m_matches.clear(); m_lineStarts.clear(); m_current = -1;
-    QString text = m_tab->document()->toPlainText();
+    const QString text = m_tab->document()->toPlainText();
+    updateScope(text);
     int offset = 0;
     for (int i = 0; i < m_tab->document()->lineCount(); ++i) {
         m_lineStarts.append(offset); offset += m_tab->document()->lineAt(i).size() + 1;
@@ -148,12 +203,15 @@ void FindBar::rebuild(bool moveCursor)
             m_count->setText(tr("Invalid pattern")); m_query->setToolTip(expression.errorString());
             m_next->setEnabled(false); m_previous->setEnabled(false); updateHighlights(); return;
         }
+        m_captureNames = expression.namedCaptureGroups();
         auto results = expression.globalMatch(text);
         while (results.hasNext()) {
             const auto result = results.next();
             const int start = result.capturedStart(), end = result.capturedEnd();
             if (m_scope->isChecked() && (start < m_scopeStart || end > m_scopeEnd)) continue;
-            m_matches.append({start, end});
+            const bool excluded = std::any_of(m_excluded.begin(), m_excluded.end(),
+                [start, end](const Match& match) { return match.start == start && match.end == end; });
+            if (!excluded) m_matches.append({start, end, result.capturedTexts()});
         }
         if (!m_matches.isEmpty()) {
             const int cursor = cursorOffset();
@@ -201,10 +259,116 @@ void FindBar::updateHighlights()
         }
     }
     area->setExtraSelections(selections);
+    m_next->setEnabled(!m_matches.isEmpty()); m_previous->setEnabled(!m_matches.isEmpty());
+    const bool canReplace = !m_matches.isEmpty() && m_current >= 0 && !area->readOnly();
+    m_replace->setEnabled(canReplace); m_replaceAll->setEnabled(canReplace);
+    m_exclude->setEnabled(!m_matches.isEmpty() && m_current >= 0);
     if (m_query->toolTip().isEmpty()) m_count->setText(m_query->text().isEmpty() ? QString() :
         tr("%1/%2").arg(m_current < 0 ? 0 : m_current + 1).arg(m_matches.size()));
 }
 void FindBar::closeSearch()
 {
     hide(); m_matches.clear(); m_current = -1; updateHighlights(); m_tab->editor()->area()->setFocus();
+}
+
+void FindBar::updateScope(const QString& text)
+{
+    if (text == m_snapshot) return;
+    m_excluded.clear();
+    if (m_scopeAvailable) {
+        int prefix = 0;
+        while (prefix < text.size() && prefix < m_snapshot.size() && text[prefix] == m_snapshot[prefix]) ++prefix;
+        int oldEnd = m_snapshot.size(), newEnd = text.size();
+        while (oldEnd > prefix && newEnd > prefix && m_snapshot[oldEnd - 1] == text[newEnd - 1]) { --oldEnd; --newEnd; }
+        auto adjust = [prefix, oldEnd, newEnd](int pos, bool end) {
+            if (pos < prefix || (pos == prefix && !end)) return pos;
+            if (pos >= oldEnd) return pos + newEnd - oldEnd;
+            return end ? newEnd : prefix;
+        };
+        m_scopeStart = adjust(m_scopeStart, false); m_scopeEnd = adjust(m_scopeEnd, true);
+    }
+    m_snapshot = text;
+}
+
+QString FindBar::replacementFor(const Match& match) const
+{
+    const QString input = m_replacement->text();
+    QString replacement;
+    for (int i = 0; i < input.size(); ++i) {
+        const QChar ch = input[i];
+        if (m_regex->isChecked() && (ch == '\\' || ch == '$') && i + 1 < input.size()) {
+            const QChar next = input[i + 1];
+            if (next.isDigit()) {
+                int end = i + 1;
+                while (end < input.size() && input[end].isDigit()) ++end;
+                const int group = input.mid(i + 1, end - i - 1).toInt();
+                if (group < match.captures.size()) { replacement += match.captures[group]; i = end - 1; continue; }
+            } else if (ch == '$' && next == '{') {
+                const int end = input.indexOf('}', i + 2);
+                const int group = end < 0 ? -1 : m_captureNames.indexOf(input.mid(i + 2, end - i - 2));
+                if (group >= 0 && group < match.captures.size()) { replacement += match.captures[group]; i = end; continue; }
+            } else if (ch == '\\') {
+                if (next == 'n') { replacement += '\n'; ++i; continue; }
+                if (next == 't') { replacement += '\t'; ++i; continue; }
+                if (next == 'r') { replacement += '\r'; ++i; continue; }
+                if (next == '\\') { replacement += '\\'; ++i; continue; }
+            }
+        }
+        replacement += ch;
+    }
+    if (m_preserveCase->isChecked()) {
+        const QString original = match.captures.value(0);
+        if (original.toUpper() != original.toLower()) {
+            if (original == original.toUpper()) replacement = replacement.toUpper();
+            else if (original == original.toLower()) replacement = replacement.toLower();
+            else if (!original.isEmpty() && original[0].isUpper() && original.mid(1) == original.mid(1).toLower()) {
+                replacement = replacement.toLower();
+                if (!replacement.isEmpty()) replacement[0] = replacement[0].toUpper();
+            }
+        }
+    }
+    return replacement;
+}
+
+void FindBar::replaceCurrent()
+{
+    auto* area = m_tab->editor()->area();
+    if (m_current < 0 || m_matches.isEmpty() || area->readOnly()) return;
+    const Match match = m_matches[m_current];
+    m_replacing = true;
+    area->undoStack()->push(new ReplaceCommand(area, positionFor(match.start), positionFor(match.end), replacementFor(match)));
+    m_replacing = false;
+    rebuild(false);
+    if (!m_matches.isEmpty()) {
+        const int after = offsetFor(area->cursorPosition());
+        auto it = std::lower_bound(m_matches.begin(), m_matches.end(), after,
+            [](const Match& item, int offset) { return item.start < offset; });
+        if (it != m_matches.end()) activate(int(it - m_matches.begin()));
+        else if (m_wrap->isChecked()) activate(0);
+    }
+}
+
+void FindBar::replaceAll()
+{
+    auto* area = m_tab->editor()->area();
+    if (m_matches.isEmpty() || area->readOnly()) return;
+    m_replacing = true;
+    area->undoStack()->beginMacro(tr("Replace All"));
+    // Backwards replacement leaves the coordinates of earlier matches unchanged.
+    for (int i = m_matches.size() - 1; i >= 0; --i) {
+        const auto& match = m_matches[i];
+        area->undoStack()->push(new ReplaceCommand(area, positionFor(match.start), positionFor(match.end), replacementFor(match)));
+    }
+    area->undoStack()->endMacro();
+    m_replacing = false;
+    rebuild();
+}
+
+void FindBar::excludeCurrent()
+{
+    if (m_current < 0 || m_matches.isEmpty()) return;
+    const int current = m_current;
+    m_excluded.append(m_matches[current]); m_matches.removeAt(current);
+    if (m_matches.isEmpty()) { m_current = -1; updateHighlights(); }
+    else activate(std::min(current, int(m_matches.size()) - 1));
 }

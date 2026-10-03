@@ -70,6 +70,11 @@ MainWindow::MainWindow(QWidget* parent)
     connect(find, &QAction::triggered, this, [this]() {
         if (auto* tab = currentTab()) tab->showSearch();
     });
+    auto* replace = searchMenu->addAction(tr("&Replace..."));
+    replace->setShortcut(QKeySequence(Qt::CTRL | Qt::Key_R));
+    connect(replace, &QAction::triggered, this, [this]() {
+        if (auto* tab = currentTab()) tab->showReplace();
+    });
     auto* next = searchMenu->addAction(tr("Find &Next"));
     next->setShortcut(QKeySequence(Qt::Key_F3));
     connect(next, &QAction::triggered, this, [this]() {

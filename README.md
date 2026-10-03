@@ -56,3 +56,10 @@ the installed component with commit `69e2760` or later). Result navigation
 selects the matched text; match decorations preserve syntax colors and do not
 re-tokenize the document. The original selection-only scope is captured before
 navigation changes the editor selection.
+
+Ctrl+R opens the replacement row. The arrow beside the search field expands
+or collapses it. **Replace** changes the active result; **Replace All** changes
+all included results in one undo step. **Exclude** skips the active result until
+the query/options or document change. **Aa** preserves upper/lower/title case.
+Regex replacements support `$1`, `\1`, `${name}`, and `\n`/`\t` escapes.
+Replacement respects selection-only search and can be undone in the editor.

@@ -23,6 +23,7 @@ set(SOURCES
 
 set(HEADERS
     src/mainwindow.h
+    src/replacecommand.h
     src/findbar.h
     src/editortab.h
     src/syntaxdata.h
