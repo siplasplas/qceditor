@@ -11,12 +11,16 @@
 #include <qce/RuleBasedFoldingProvider.h>
 
 class QVBoxLayout;
+class FindBar;
 
 class EditorTab : public QWidget
 {
     Q_OBJECT
 public:
     explicit EditorTab(QWidget* parent = nullptr);
+
+    void showSearch();
+    void findNext(bool backwards = false);
 
     bool loadFile(const QString& path);
     bool save();
@@ -58,6 +62,8 @@ private:
     QString m_themeFile;
     KateTheme m_theme;
     QPalette m_defaultPalette;
+
+    FindBar* m_findBar = nullptr;
 
     QString m_filePath;
     bool    m_modified = false;

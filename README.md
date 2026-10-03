@@ -43,3 +43,16 @@ Manual selection survives Save As and syntax-definition updates for the open tab
 the current tab, including syntax colors, editor background and normal text.
 **Default** restores the original palette. Theme selection survives syntax
 changes, Save As and definition updates for the open tab.
+
+Use **Search > Find** (Ctrl+F) to open the inline search bar above the current
+editor. It shows the current/total match count, marks all matches and emphasizes
+the current one. Use the arrows, Enter/F3 or Shift+Enter/Shift+F3 to navigate.
+Options include wrap around, case sensitivity, whole words, regular expressions
+and searching inside the current selection. Escape closes the bar. Each tab
+keeps its own query and search options; search does not modify document contents.
+
+Search uses qcodeedit's `setSelection` and `setExtraSelections` APIs (requires
+the installed component with commit `69e2760` or later). Result navigation
+selects the matched text; match decorations preserve syntax colors and do not
+re-tokenize the document. The original selection-only scope is captured before
+navigation changes the editor selection.

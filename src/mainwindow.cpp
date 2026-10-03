@@ -64,6 +64,23 @@ MainWindow::MainWindow(QWidget* parent)
     fileMenu->addSeparator();
     addAction(tr("E&xit"), QKeySequence::Quit, &MainWindow::close);
 
+    auto* searchMenu = menuBar()->addMenu(tr("&Search"));
+    auto* find = searchMenu->addAction(tr("&Find..."));
+    find->setShortcut(QKeySequence::Find);
+    connect(find, &QAction::triggered, this, [this]() {
+        if (auto* tab = currentTab()) tab->showSearch();
+    });
+    auto* next = searchMenu->addAction(tr("Find &Next"));
+    next->setShortcut(QKeySequence(Qt::Key_F3));
+    connect(next, &QAction::triggered, this, [this]() {
+        if (auto* tab = currentTab()) tab->findNext();
+    });
+    auto* previous = searchMenu->addAction(tr("Find &Previous"));
+    previous->setShortcut(QKeySequence(Qt::SHIFT | Qt::Key_F3));
+    connect(previous, &QAction::triggered, this, [this]() {
+        if (auto* tab = currentTab()) tab->findNext(true);
+    });
+
     auto* toolsMenu = menuBar()->addMenu(tr("&Tools"));
     toolsMenu->addAction(tr("&Update Syntax Definitions"),
                          this, &MainWindow::updateSyntaxData);

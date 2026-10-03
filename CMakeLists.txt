@@ -16,12 +16,14 @@ find_package(qcodeedit-katedata REQUIRED)
 set(SOURCES
     src/main.cpp
     src/mainwindow.cpp
+    src/findbar.cpp
     src/editortab.cpp
     src/syntaxdata.cpp
 )
 
 set(HEADERS
     src/mainwindow.h
+    src/findbar.h
     src/editortab.h
     src/syntaxdata.h
 )

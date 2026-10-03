@@ -1,4 +1,5 @@
 #include "editortab.h"
+#include "findbar.h"
 #include <QVBoxLayout>
 #include <QFile>
 #include <QTextStream>
@@ -47,6 +48,9 @@ EditorTab::EditorTab(QWidget* parent)
 
     auto* layout = new QVBoxLayout(this);
     layout->setContentsMargins(0, 0, 0, 0);
+    layout->setSpacing(0);
+    m_findBar = new FindBar(this);
+    layout->addWidget(m_findBar);
     layout->addWidget(m_edit);
 
     connect(m_doc, &qce::SimpleTextDocument::linesChanged,
@@ -55,6 +59,16 @@ EditorTab::EditorTab(QWidget* parent)
             this, &EditorTab::onDocumentChanged);
     connect(m_doc, &qce::SimpleTextDocument::linesRemoved,
             this, &EditorTab::onDocumentChanged);
+}
+
+void EditorTab::showSearch()
+{
+    m_findBar->showSearch();
+}
+
+void EditorTab::findNext(bool backwards)
+{
+    m_findBar->findNext(backwards);
 }
 
 void EditorTab::showContextMenu(const QPoint& position)
