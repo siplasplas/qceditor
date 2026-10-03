@@ -84,3 +84,11 @@ The list is saved atomically as `recentFiles` in a JSON `config.json` under
 `QStandardPaths::GenericDataLocation/qceditor`, normally
 `~/.local/share/qceditor/config.json` on Linux (honoring `XDG_DATA_HOME`).
 Other JSON configuration keys are preserved.
+
+When the main window becomes active (for example after Alt+Tab), QCEditor
+compares modification times and sizes of all files open in tabs with their
+last read/saved versions. Changed files reload automatically unless the tab
+has unsaved edits; then a confirmation asks before discarding those edits.
+Reload keeps the cursor/selection and the tab's syntax/theme choices. Positions
+are clamped to the new text when the file shrinks. Show events alone do not
+trigger this check; untitled and missing files are skipped.

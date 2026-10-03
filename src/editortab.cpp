@@ -216,18 +216,59 @@ void EditorTab::onDocumentChanged()
 
 bool EditorTab::loadFile(const QString& path)
 {
+    return readFile(path, true);
+}
+
+bool EditorTab::hasExternalChanges() const
+{
+    if (m_filePath.isEmpty()) return false;
+    const QFileInfo file(m_filePath);
+    return file.isFile() && (file.lastModified() != m_diskModified || file.size() != m_diskSize);
+}
+
+void EditorTab::updateDiskStamp()
+{
+    const QFileInfo file(m_filePath);
+    m_diskModified = file.lastModified();
+    m_diskSize = file.size();
+}
+
+bool EditorTab::reloadFromDisk()
+{
+    if (m_filePath.isEmpty()) return false;
+    auto* area = m_edit->area();
+    const auto cursor = area->cursorPosition();
+    const auto anchor = cursor == area->selectionStart() ? area->selectionEnd() : area->selectionStart();
+    if (!readFile(m_filePath, false)) return false;
+    // The component clamps both endpoints if lines or columns no longer exist.
+    area->setSelection(anchor, cursor);
+    const auto clampedCursor = area->cursorPosition();
+    const auto clampedAnchor = clampedCursor == area->selectionStart() ? area->selectionEnd() : area->selectionStart();
+    revealRange(area->selectionStart(), area->selectionEnd());
+    area->setSelection(clampedAnchor, clampedCursor);
+    return true;
+}
+
+bool EditorTab::readFile(const QString& path, bool resetSyntax)
+{
     QFile f(path);
     if (!f.open(QIODevice::ReadOnly | QIODevice::Text))
         return false;
 
+    const QFileInfo stamp(f);
+    const auto modified = stamp.lastModified();
+    const auto size = stamp.size();
     QTextStream in(&f);
     in.setEncoding(QStringConverter::Utf8);
     QString text = in.readAll();
+    if (in.status() != QTextStream::Ok || f.error() != QFileDevice::NoError) return false;
 
     disconnect(m_doc, nullptr, this, nullptr);
     m_doc->setText(text);
     m_modified = false;
     m_filePath = path;
+    m_diskModified = modified;
+    m_diskSize = size;
 
     connect(m_doc, &qce::SimpleTextDocument::linesChanged,
             this, &EditorTab::onDocumentChanged);
@@ -236,9 +277,12 @@ bool EditorTab::loadFile(const QString& path)
     connect(m_doc, &qce::SimpleTextDocument::linesRemoved,
             this, &EditorTab::onDocumentChanged);
 
-    m_syntaxMode = SyntaxMode::Automatic;
-    m_syntaxFile.clear();
+    if (resetSyntax) {
+        m_syntaxMode = SyntaxMode::Automatic;
+        m_syntaxFile.clear();
+    }
     reapplyHighlighter();
+    emit modificationChanged(false);
     return true;
 }
 
@@ -258,9 +302,13 @@ bool EditorTab::saveAs(const QString& path)
     QTextStream out(&f);
     out.setEncoding(QStringConverter::Utf8);
     out << m_doc->toPlainText();
+    out.flush();
+    if (out.status() != QTextStream::Ok || !f.flush()) return false;
+    f.close();
 
     const bool renamed = path != m_filePath;
     m_filePath = path;
+    updateDiskStamp();
     m_modified = false;
     emit modificationChanged(false);
     if (renamed)

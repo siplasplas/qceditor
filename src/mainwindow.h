@@ -19,6 +19,7 @@ public:
 
 protected:
     void closeEvent(QCloseEvent* event) override;
+    void changeEvent(QEvent* event) override;
 
 private slots:
     void newFile();
@@ -40,12 +41,14 @@ private:
     bool       confirmClose(EditorTab* tab);
     bool       saveTabAs(EditorTab* tab);
     void       offerSyntaxDownload();
+    void       checkExternalChanges();
     void       loadRecentFiles();
     void       saveRecentFiles();
     void       updateRecentFilesMenu();
     bool       addRecentFile(const QString& path);
     qce::kate::KateDataDownloader* downloader();
 
+    bool m_checkingExternalChanges = false;
     QMenu* m_recentFilesMenu = nullptr;
     QStringList m_recentFiles;
     QString m_configPath;

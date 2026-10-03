@@ -1,6 +1,7 @@
 #pragma once
 #include <QWidget>
 #include <QPalette>
+#include <QDateTime>
 #include <qce/kate/KateTheme.h>
 #include <memory>
 #include <qce/CodeEdit.h>
@@ -25,6 +26,8 @@ public:
     void findNext(bool backwards = false);
 
     bool loadFile(const QString& path);
+    bool hasExternalChanges() const;
+    bool reloadFromDisk();
     bool save();
     bool saveAs(const QString& path);
 
@@ -42,6 +45,8 @@ signals:
     void modificationChanged(bool modified);
 
 private:
+    bool readFile(const QString& path, bool resetSyntax);
+    void updateDiskStamp();
     void onDocumentChanged();
     void showContextMenu(const QPoint& position);
     void applyThemePalette();
@@ -67,6 +72,8 @@ private:
 
     FindBar* m_findBar = nullptr;
 
+    QDateTime m_diskModified;
+    qint64 m_diskSize = -1;
     QString m_filePath;
     bool    m_modified = false;
 };

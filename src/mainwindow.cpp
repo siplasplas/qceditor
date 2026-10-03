@@ -14,6 +14,9 @@
 #include <QStandardPaths>
 #include <QJsonDocument>
 #include <QJsonArray>
+#include <QEvent>
+#include <QScopedValueRollback>
+#include <QPointer>
 #include <QKeySequence>
 #include <QSettings>
 #include <QTimer>
@@ -134,6 +137,33 @@ MainWindow::MainWindow(QWidget* parent)
 
     // After the window is shown: offer the first download if needed.
     QTimer::singleShot(0, this, &MainWindow::offerSyntaxDownload);
+}
+
+void MainWindow::changeEvent(QEvent* event)
+{
+    QMainWindow::changeEvent(event);
+    if (event->type() == QEvent::ActivationChange && isActiveWindow())
+        checkExternalChanges();
+}
+
+void MainWindow::checkExternalChanges()
+{
+    if (m_checkingExternalChanges) return;
+    QScopedValueRollback<bool> checking(m_checkingExternalChanges, true);
+    for (int i = 0; i < m_tabs->count(); ++i) {
+        QPointer<EditorTab> tab = tabAt(i);
+        if (!tab || !tab->hasExternalChanges()) continue;
+        if (tab->isModified()) {
+            const auto answer = QMessageBox::question(this, tr("File Changed on Disk"),
+                tr("%1 changed on disk and has unsaved edits. Reload the disk version and discard those edits?")
+                    .arg(tab->filePath()), QMessageBox::Yes | QMessageBox::No, QMessageBox::No);
+            if (answer != QMessageBox::Yes || !tab) continue;
+        }
+        if (!tab->reloadFromDisk())
+            statusBar()->showMessage(tr("Cannot reload file: %1").arg(tab->filePath()), 8000);
+    }
+    updateWindowTitle();
+    updateStatusBar(currentTab());
 }
 
 void MainWindow::loadRecentFiles()
