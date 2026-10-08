@@ -4,7 +4,7 @@ Editor that uses qcodeedit and the shared MruTabWidget from qt-extra.
 
 ## Building
 
-Requires C++17, CMake 3.16+, Qt 6.2+, installed qcodeedit 1.8.1 packages
+Requires C++17, CMake 3.16+, Qt 6.2+, installed qcodeedit 1.12.0 packages
 (`qcodeedit`, `qcodeedit-kate`, `qcodeedit-katedata`, `qcodeedit-encoding`,
 the last one with [cpg](https://github.com/siplasplas/cpg)) and qt-extra 2.x.
 Like gemini-commander, QCEditor uses `find_package(qt-extra 2 REQUIRED)`
@@ -61,6 +61,9 @@ not slowed down; source code usually comes out as English. Typing or pasting cha
 whether to write them as `?` or switch the file to UTF-8. **Encoding** in the
 context menu reopens the file in another encoding or saves it in another one
 (e.g. UTF-8) from now on.
+
+The line with the caret has a slightly darker background (lighter on dark
+themes).
 
 Use **Search > Find** (Ctrl+F) to open the inline search bar above the current
 editor. It shows the current/total match count, marks all matches and emphasizes
