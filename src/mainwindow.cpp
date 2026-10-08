@@ -25,6 +25,7 @@
 #include <QDialogButtonBox>
 #include <QPushButton>
 #include <QRegularExpression>
+#include <QHash>
 #include <optional>
 #include <qce/CodeEditArea.h>
 #include <qce/TextCursor.h>
@@ -43,6 +44,24 @@ static QString normalizedFilePath(const QString& path)
 
 static const char* kDeclinedKey = "syntaxData/declinedDownload";
 
+// Status bar texts for the file format reported by qcodeedit-encoding.
+static QString lineBreaksText(const qce::encoding::FileFormat& format, bool ignoreMixed = false)
+{
+    if (format.mixedLineBreaks && !ignoreMixed) return QObject::tr("Mixed");
+    if (format.cr) return QObject::tr("Mac (CR)");
+    if (format.crlf) return QObject::tr("Windows (CRLF)");
+    return QObject::tr("Unix (LF)");
+}
+
+static QString encodingText(const qce::encoding::FileFormat& format)
+{
+    static const QHash<QString, QString> unicode = {
+        {"utf8", "UTF-8"}, {"utf16", "UTF-16LE"}, {"utf16be", "UTF-16BE"},
+        {"utf32", "UTF-32LE"}, {"utf32be", "UTF-32BE"}};
+    const QString name = unicode.value(format.encoding.toLower(), format.encoding);
+    return format.bom ? name + " BOM" : name;
+}
+
 MainWindow::MainWindow(QWidget* parent)
     : QMainWindow(parent)
 {
@@ -55,10 +74,12 @@ MainWindow::MainWindow(QWidget* parent)
     m_tabs->setTabLimit(20);
     setCentralWidget(m_tabs);
 
-    m_statusEncoding = new QLabel(this);
-    statusBar()->addPermanentWidget(m_statusEncoding);
-    m_statusPos = new QLabel(this);
-    statusBar()->addPermanentWidget(m_statusPos);
+    // Status bar: line:column | line breaks | encoding | language | tab width.
+    for (QLabel** label : {&m_statusPos, &m_statusLineBreaks, &m_statusEncoding,
+                           &m_statusLanguage, &m_statusTab}) {
+        *label = new QLabel(this);
+        statusBar()->addPermanentWidget(*label);
+    }
 
     auto* fileMenu = menuBar()->addMenu(tr("&File"));
 
@@ -245,8 +266,14 @@ void MainWindow::goToPosition()
     QInputDialog dialog(this);
     dialog.setWindowTitle(tr("Go to Line/Column"));
     dialog.setLabelText(tr("Line[:column] (1–%1):").arg(lineCount));
-    dialog.setInputMode(QInputDialog::TextInput);
-    dialog.setTextValue(QString("%1:%2").arg(cursor.line + 1).arg(cursor.column + 1));
+    // Editable combo: the current position, then positions entered before
+    // (this session only, not saved).
+    QStringList items{QString("%1:%2").arg(cursor.line + 1).arg(cursor.column + 1)};
+    for (const QString& recent : m_recentPositions)
+        if (!items.contains(recent)) items << recent;
+    dialog.setComboBoxItems(items);
+    dialog.setComboBoxEditable(true);
+    dialog.setTextValue(items.first());
 
     auto position = [tab, lineCount](const QString& text) -> std::optional<qce::TextCursor> {
         static const QRegularExpression pattern(QStringLiteral("^\\s*([1-9][0-9]*)\\s*(?::\\s*([1-9][0-9]*)\\s*)?$"));
@@ -271,6 +298,12 @@ void MainWindow::goToPosition()
     });
     if (dialog.exec() != QDialog::Accepted) return;
     if (const auto target = position(dialog.textValue())) {
+        // Remembered without spaces, most recent first.
+        QString entered = dialog.textValue();
+        entered.remove(QRegularExpression(QStringLiteral("\\s")));
+        m_recentPositions.removeAll(entered);
+        m_recentPositions.prepend(entered);
+        while (m_recentPositions.size() > 20) m_recentPositions.removeLast();
         tab->revealRange(*target, *target);
         area->setCursorPosition(*target);
         area->setFocus();
@@ -360,11 +393,11 @@ EditorTab* MainWindow::createTab(const QString& title)
     connect(tab->editor()->area(), &qce::CodeEditArea::cursorPositionChanged,
             this, [this, tab](qce::TextCursor c) {
         if (tab == currentTab())
-            m_statusPos->setText(tr("Ln %1  Col %2").arg(c.line + 1).arg(c.column + 1));
+            m_statusPos->setText(QString("%1:%2").arg(c.line + 1).arg(c.column + 1));
     });
-    connect(tab, &EditorTab::encodingChanged, this, [this, tab](const QString& encoding) {
+    connect(tab, &EditorTab::statusChanged, this, [this, tab]() {
         if (tab == currentTab())
-            m_statusEncoding->setText(encoding);
+            updateStatusBar(tab);
     });
 
     return tab;
@@ -518,10 +551,25 @@ void MainWindow::updateWindowTitle()
 
 void MainWindow::updateStatusBar(EditorTab* tab)
 {
-    if (!tab) { m_statusPos->clear(); m_statusEncoding->clear(); return; }
-    m_statusEncoding->setText(tab->encoding());
-    qce::TextCursor c = tab->editor()->area()->cursorPosition();
-    m_statusPos->setText(tr("Ln %1  Col %2").arg(c.line + 1).arg(c.column + 1));
+    const QList<QLabel*> labels = {m_statusPos, m_statusLineBreaks, m_statusEncoding,
+                                   m_statusLanguage, m_statusTab};
+    if (!tab) {
+        for (QLabel* label : labels) label->clear();
+        return;
+    }
+    const auto* area = tab->editor()->area();
+    const qce::TextCursor c = area->cursorPosition();
+    m_statusPos->setText(QString("%1:%2").arg(c.line + 1).arg(c.column + 1));
+    const auto format = tab->fileFormat();
+    m_statusLineBreaks->setText(lineBreaksText(format));
+    // A mixed file is saved with its most frequent kind of line break.
+    m_statusLineBreaks->setToolTip(format.mixedLineBreaks
+        ? tr("Mixed line breaks; saving uses %1").arg(lineBreaksText(format, true))
+        : QString());
+    m_statusEncoding->setText(encodingText(format));
+    m_statusLanguage->setText(tab->languageName());
+    m_statusLanguage->setToolTip(tr("Language detected from the text"));
+    m_statusTab->setText(tr("Tab: %1").arg(area->tabWidth()));
 }
 
 void MainWindow::closeEvent(QCloseEvent* event)

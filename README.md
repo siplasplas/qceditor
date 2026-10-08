@@ -48,9 +48,16 @@ the editor shows black text on white. Theme selection survives syntax
 changes, Save As and definition updates for the open tab.
 
 Files are opened in their own encoding: UTF-8/16/32 or a legacy code page such
-as cp1250, ISO 8859-2 or cp852, detected automatically and shown in the status
-bar. They are saved in the same encoding, keeping BOM, CRLF line ends and the
-final line break. Typing or pasting characters the code page cannot store asks
+as cp1250, ISO 8859-2 or cp852, detected automatically. They are saved in the
+same encoding, keeping BOM, line breaks (Windows CRLF, Unix LF or classic Mac
+CR) and the final line break; a file with mixed line breaks is saved with its
+most frequent kind.
+
+The status bar shows `line:column`, the line breaks (**Unix (LF)**,
+**Windows (CRLF)**, **Mac (CR)** or **Mixed**), the encoding (**UTF-8**,
+**UTF-8 BOM** or the code page), the text's language, and the tab width. The
+language is detected in the background after the file is shown, so opening is
+not slowed down; source code usually comes out as English. Typing or pasting characters the code page cannot store asks
 whether to write them as `?` or switch the file to UTF-8. **Encoding** in the
 context menu reopens the file in another encoding or saves it in another one
 (e.g. UTF-8) from now on.
@@ -80,7 +87,9 @@ including nested folds and folds intersecting a multiline match. Other folds
 keep their current state.
 
 Ctrl+G opens the standard Qt input dialog with the current one-based
-`line:column` selected. Enter `line:column` or just `line` (column 1).
+`line:column` selected. Enter `line:column` or just `line` (column 1). The
+drop-down lists positions entered before, without spaces, most recent first;
+they are kept only while the application runs.
 OK moves the cursor and reveals any folds hiding the destination; Cancel leaves
 the position unchanged. Invalid or out-of-range positions disable OK.
 

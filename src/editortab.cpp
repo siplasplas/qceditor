@@ -43,7 +43,7 @@ EditorTab::EditorTab(QWidget* parent)
     // Keeps typed and pasted text storable in the file's code page.
     m_encoding = new qce::encoding::EncodingGuard(m_edit->area(), this);
     connect(m_encoding, &qce::encoding::EncodingGuard::encodingChanged,
-            this, &EditorTab::encodingChanged);
+            this, &EditorTab::statusChanged);
     // Switching to UTF-8 is a change that needs saving.
     connect(m_encoding, &qce::encoding::EncodingGuard::encodingChanged,
             this, &EditorTab::onDocumentChanged);
@@ -263,6 +263,11 @@ void EditorTab::addEncodingMenu(QMenu& menu)
     });
 }
 
+qce::encoding::FileFormat EditorTab::fileFormat() const
+{
+    return m_encoding->format();
+}
+
 QString EditorTab::encoding() const
 {
     return m_encoding->encoding();
@@ -344,7 +349,15 @@ bool EditorTab::readFile(const QString& path, bool resetSyntax, const QString& e
         const QSignalBlocker block(m_encoding);
         m_encoding->setFormat(decoded.format);
     }
-    emit encodingChanged(m_encoding->encoding());
+    // The language is guessed in the background; the file is shown at once.
+    m_language = {};
+    const int request = ++m_languageRequest;
+    qce::encoding::detectLanguageAsync(bytes, this, [this, request](const qce::encoding::Language& language) {
+        if (request != m_languageRequest) return;
+        m_language = language;
+        emit statusChanged();
+    });
+    emit statusChanged();
     m_modified = false;
     m_filePath = path;
     m_diskModified = modified;
@@ -393,6 +406,14 @@ bool EditorTab::saveAs(const QString& path)
     updateDiskStamp();
     m_modified = false;
     emit modificationChanged(false);
+    if (m_encoding->format().mixedLineBreaks) {
+        // Saved with one kind of line break for every line.
+        auto format = m_encoding->format();
+        format.mixedLineBreaks = false;
+        const QSignalBlocker block(m_encoding);
+        m_encoding->setFormat(format);
+    }
+    emit statusChanged();
     if (renamed)
         reapplyHighlighter();
     return true;

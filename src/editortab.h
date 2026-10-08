@@ -10,6 +10,7 @@
 #include <qce/margins/FoldingGutter.h>
 #include <qce/RulesHighlighter.h>
 #include <qce/RuleBasedFoldingProvider.h>
+#include <qce/encoding/Encoding.h>
 
 class QMenu;
 class QVBoxLayout;
@@ -42,6 +43,11 @@ public:
     bool reopenWithEncoding(const QString& encoding);
     /// Saves from now on in `encoding`; the text stays as it is.
     void setSaveEncoding(const QString& encoding);
+    /// Encoding, BOM and line breaks of the file, for the status bar.
+    qce::encoding::FileFormat fileFormat() const;
+    /// Natural language of the file, detected in the background after
+    /// loading ("Polish"); empty until known.
+    QString languageName() const { return m_language.name; }
 
     QString filePath() const { return m_filePath; }
     bool    isModified() const { return m_modified; }
@@ -55,7 +61,8 @@ public:
 
 signals:
     void modificationChanged(bool modified);
-    void encodingChanged(const QString& encoding);
+    /// Encoding, line breaks or language changed (status bar refresh).
+    void statusChanged();
 
 private:
     /// Empty `encoding` detects it.
@@ -88,6 +95,8 @@ private:
     FindBar* m_findBar = nullptr;
     qce::encoding::EncodingGuard* m_encoding = nullptr;
     bool m_saveCancelled = false;
+    qce::encoding::Language m_language;
+    int m_languageRequest = 0; ///< ignores results for an older load
 
     QDateTime m_diskModified;
     qint64 m_diskSize = -1;

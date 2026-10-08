@@ -1,4 +1,5 @@
 #include <QApplication>
+#include <qce/encoding/Encoding.h>
 #include "mainwindow.h"
 
 int main(int argc, char* argv[])
@@ -6,6 +7,8 @@ int main(int argc, char* argv[])
     QApplication app(argc, argv);
     app.setApplicationName("QCEditor");
     app.setOrganizationName("qceditor");
+    // Encoding/language models load in the background while the window opens.
+    qce::encoding::preloadDetectionData();
 
     MainWindow window;
     window.show();

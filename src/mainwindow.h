@@ -55,7 +55,12 @@ private:
     QJsonObject m_config;
 
     MruTabWidget* m_tabs      = nullptr;
-    QLabel*       m_statusPos = nullptr;
-    QLabel*       m_statusEncoding = nullptr;
+    QLabel*       m_statusPos = nullptr;        ///< line:column
+    QLabel*       m_statusLineBreaks = nullptr; ///< Unix (LF), Windows (CRLF), Mac (CR), Mixed
+    QLabel*       m_statusEncoding = nullptr;   ///< UTF-8 or the code page
+    QLabel*       m_statusLanguage = nullptr;   ///< detected in the background
+    QLabel*       m_statusTab = nullptr;        ///< tab width in spaces
+    /// Positions recently entered in Go to (most recent first); this session only.
+    QStringList   m_recentPositions;
     qce::kate::KateDataDownloader* m_downloader = nullptr;
 };
