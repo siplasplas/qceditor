@@ -40,8 +40,10 @@ a Kate syntax definition for that tab. Sections come from the syntax index.
 Manual selection survives Save As and syntax-definition updates for the open tab.
 
 **Theme** in the same context menu selects a downloaded Kate color theme for
-the current tab, including syntax colors, editor background and normal text.
-**Default** restores the original palette. Theme selection survives syntax
+the current tab, including syntax colors, editor background, normal text and
+the line-number gutter. **Default** uses Breeze Light, or Breeze Dark on a
+dark desktop (Breeze Light when Breeze Dark is missing); without these themes
+the editor shows black text on white. Theme selection survives syntax
 changes, Save As and definition updates for the open tab.
 
 Use **Search > Find** (Ctrl+F) to open the inline search bar above the current

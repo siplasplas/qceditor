@@ -59,6 +59,9 @@ EditorTab::EditorTab(QWidget* parent)
             this, &EditorTab::onDocumentChanged);
     connect(m_doc, &qce::SimpleTextDocument::linesRemoved,
             this, &EditorTab::onDocumentChanged);
+
+    m_theme = KateTheme::loadDefault();
+    applyThemePalette();
 }
 
 void EditorTab::revealRange(qce::TextCursor start, qce::TextCursor end)
@@ -332,6 +335,8 @@ void EditorTab::applyThemePalette()
     m_edit->area()->setPalette(palette);
     m_edit->area()->viewport()->setPalette(palette);
     m_edit->area()->viewport()->update();
+    // Invalid colours (no theme, or missing in it) are derived from the palette.
+    m_edit->setGutterColors({m_theme.iconBorder, m_theme.lineNumbers, m_theme.separator});
 }
 
 qce::TextAttribute EditorTab::themedAttribute(const QString& style,
@@ -350,6 +355,10 @@ void EditorTab::reapplyHighlighter()
         const auto theme = KateTheme::load(m_themeFile);
         if (theme.isValid())
             m_theme = theme;
+    } else {
+        // "Default": Breeze Light/Dark to match the desktop, or the editor's
+        // built-in black on white when the themes are not downloaded.
+        m_theme = KateTheme::loadDefault();
     }
     applyThemePalette();
     if (m_syntaxMode == SyntaxMode::PlainText) {
