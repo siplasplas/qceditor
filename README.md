@@ -4,8 +4,9 @@ Editor that uses qcodeedit and the shared MruTabWidget from qt-extra.
 
 ## Building
 
-Requires C++17, CMake 3.16+, Qt 6.2+, installed qcodeedit packages
-(`qcodeedit`, `qcodeedit-kate`, `qcodeedit-katedata`) and qt-extra 2.x.
+Requires C++17, CMake 3.16+, Qt 6.2+, installed qcodeedit 1.8.1 packages
+(`qcodeedit`, `qcodeedit-kate`, `qcodeedit-katedata`, `qcodeedit-encoding`,
+the last one with [cpg](https://github.com/siplasplas/cpg)) and qt-extra 2.x.
 Like gemini-commander, QCEditor uses `find_package(qt-extra 2 REQUIRED)`
 and links the installed `qt-extra` target; no widget sources are copied here.
 
@@ -45,6 +46,14 @@ the line-number gutter. **Default** uses Breeze Light, or Breeze Dark on a
 dark desktop (Breeze Light when Breeze Dark is missing); without these themes
 the editor shows black text on white. Theme selection survives syntax
 changes, Save As and definition updates for the open tab.
+
+Files are opened in their own encoding: UTF-8/16/32 or a legacy code page such
+as cp1250, ISO 8859-2 or cp852, detected automatically and shown in the status
+bar. They are saved in the same encoding, keeping BOM, CRLF line ends and the
+final line break. Typing or pasting characters the code page cannot store asks
+whether to write them as `?` or switch the file to UTF-8. **Encoding** in the
+context menu reopens the file in another encoding or saves it in another one
+(e.g. UTF-8) from now on.
 
 Use **Search > Find** (Ctrl+F) to open the inline search bar above the current
 editor. It shows the current/total match count, marks all matches and emphasizes

@@ -9,9 +9,10 @@ set(CMAKE_AUTORCC ON)
 
 find_package(Qt6 6.2 REQUIRED COMPONENTS Core Gui Widgets)
 find_package(qt-extra 2 REQUIRED)
-find_package(qcodeedit REQUIRED)
+find_package(qcodeedit 1.8.1 REQUIRED)
 find_package(qcodeedit-kate REQUIRED)
 find_package(qcodeedit-katedata REQUIRED)
+find_package(qcodeedit-encoding 1.8.1 REQUIRED)
 
 set(SOURCES
     src/main.cpp
@@ -41,4 +42,5 @@ target_link_libraries(qceditor PRIVATE
     qcodeedit::qcodeedit
     qcodeedit::kate
     qcodeedit::katedata
+    qcodeedit::encoding
 )

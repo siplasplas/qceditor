@@ -56,5 +56,6 @@ private:
 
     MruTabWidget* m_tabs      = nullptr;
     QLabel*       m_statusPos = nullptr;
+    QLabel*       m_statusEncoding = nullptr;
     qce::kate::KateDataDownloader* m_downloader = nullptr;
 };

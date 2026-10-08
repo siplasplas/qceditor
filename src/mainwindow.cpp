@@ -55,6 +55,8 @@ MainWindow::MainWindow(QWidget* parent)
     m_tabs->setTabLimit(20);
     setCentralWidget(m_tabs);
 
+    m_statusEncoding = new QLabel(this);
+    statusBar()->addPermanentWidget(m_statusEncoding);
     m_statusPos = new QLabel(this);
     statusBar()->addPermanentWidget(m_statusPos);
 
@@ -360,6 +362,10 @@ EditorTab* MainWindow::createTab(const QString& title)
         if (tab == currentTab())
             m_statusPos->setText(tr("Ln %1  Col %2").arg(c.line + 1).arg(c.column + 1));
     });
+    connect(tab, &EditorTab::encodingChanged, this, [this, tab](const QString& encoding) {
+        if (tab == currentTab())
+            m_statusEncoding->setText(encoding);
+    });
 
     return tab;
 }
@@ -415,7 +421,7 @@ void MainWindow::saveFile()
         saveFileAs();
         return;
     }
-    if (!tab->save())
+    if (!tab->save() && !tab->saveCancelled())
         QMessageBox::critical(this, tr("Error"),
                               tr("Cannot save file:\n%1").arg(tab->filePath()));
     updateWindowTitle();
@@ -435,8 +441,9 @@ bool MainWindow::saveTabAs(EditorTab* tab)
     if (path.isEmpty()) return false;
 
     if (!tab->saveAs(path)) {
-        QMessageBox::critical(this, tr("Error"),
-                              tr("Cannot save file:\n%1").arg(path));
+        if (!tab->saveCancelled())
+            QMessageBox::critical(this, tr("Error"),
+                                  tr("Cannot save file:\n%1").arg(path));
         return false;
     }
 
@@ -511,7 +518,8 @@ void MainWindow::updateWindowTitle()
 
 void MainWindow::updateStatusBar(EditorTab* tab)
 {
-    if (!tab) { m_statusPos->clear(); return; }
+    if (!tab) { m_statusPos->clear(); m_statusEncoding->clear(); return; }
+    m_statusEncoding->setText(tab->encoding());
     qce::TextCursor c = tab->editor()->area()->cursorPosition();
     m_statusPos->setText(tr("Ln %1  Col %2").arg(c.line + 1).arg(c.column + 1));
 }

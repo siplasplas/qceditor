@@ -11,8 +11,10 @@
 #include <qce/RulesHighlighter.h>
 #include <qce/RuleBasedFoldingProvider.h>
 
+class QMenu;
 class QVBoxLayout;
 class FindBar;
+namespace qce::encoding { class EncodingGuard; }
 
 class EditorTab : public QWidget
 {
@@ -30,6 +32,16 @@ public:
     bool reloadFromDisk();
     bool save();
     bool saveAs(const QString& path);
+    /// True when the last save was cancelled in the encoding question
+    /// (characters the file's code page cannot store), not failed.
+    bool saveCancelled() const { return m_saveCancelled; }
+
+    /// Encoding the file was read in and is saved in (cpg name, e.g. cp1250).
+    QString encoding() const;
+    /// Reads the file again, decoding it as `encoding`.
+    bool reopenWithEncoding(const QString& encoding);
+    /// Saves from now on in `encoding`; the text stays as it is.
+    void setSaveEncoding(const QString& encoding);
 
     QString filePath() const { return m_filePath; }
     bool    isModified() const { return m_modified; }
@@ -43,9 +55,12 @@ public:
 
 signals:
     void modificationChanged(bool modified);
+    void encodingChanged(const QString& encoding);
 
 private:
-    bool readFile(const QString& path, bool resetSyntax);
+    /// Empty `encoding` detects it.
+    bool readFile(const QString& path, bool resetSyntax, const QString& encoding = {});
+    void addEncodingMenu(QMenu& menu);
     void updateDiskStamp();
     void onDocumentChanged();
     void showContextMenu(const QPoint& position);
@@ -71,6 +86,8 @@ private:
     QPalette m_defaultPalette;
 
     FindBar* m_findBar = nullptr;
+    qce::encoding::EncodingGuard* m_encoding = nullptr;
+    bool m_saveCancelled = false;
 
     QDateTime m_diskModified;
     qint64 m_diskSize = -1;
