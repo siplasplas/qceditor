@@ -55,6 +55,14 @@ public:
     /// Natural language of the file, detected in the background after
     /// loading ("Polish"); empty until known.
     QString languageName() const { return m_language.name; }
+    /// Probability of that language (0..1); 0 until known.
+    double languageConfidence() const { return m_language.confidence; }
+
+    /// Languages of files not in UTF-8 (cpg keys, e.g. "pl", "cz"): only their
+    /// code pages are considered when detecting; empty = all languages.
+    /// Kept in the application's settings.
+    static QStringList legacyLanguages();
+    static void setLegacyLanguages(const QStringList& languages);
 
     QString filePath() const { return m_filePath; }
     bool    isModified() const { return m_modified; }

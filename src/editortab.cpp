@@ -15,6 +15,7 @@
 #include <QMap>
 #include <QMessageBox>
 #include <QSaveFile>
+#include <QSettings>
 #include <QSignalBlocker>
 #include <algorithm>
 #include <functional>
@@ -294,6 +295,20 @@ void EditorTab::addEncodingMenu(QMenu& menu)
     });
 }
 
+static const char* kLegacyLanguagesKey = "encoding/legacyLanguages";
+
+QStringList EditorTab::legacyLanguages()
+{
+    return QSettings().value(kLegacyLanguagesKey).toStringList();
+}
+
+void EditorTab::setLegacyLanguages(const QStringList& languages)
+{
+    QSettings settings;
+    if (languages.isEmpty()) settings.remove(kLegacyLanguagesKey);
+    else settings.setValue(kLegacyLanguagesKey, languages);
+}
+
 void EditorTab::reopenAsking(const QString& name)
 {
     if (m_filePath.isEmpty()) return;
@@ -414,7 +429,7 @@ bool EditorTab::readFile(const QString& path, bool resetSyntax, const QString& e
     const QByteArray bytes = f.readAll();
     if (f.error() != QFileDevice::NoError) return false;
     // Code page or UTF, detected unless given; saved back the same way.
-    const auto decoded = qce::encoding::decode(bytes, encoding);
+    const auto decoded = qce::encoding::decode(bytes, encoding, legacyLanguages());
     if (!decoded.ok) return false;
     // Detected without confidence: shown with the most likely encoding at once,
     // and a notice offers the choice. A given encoding (chosen, or kept on

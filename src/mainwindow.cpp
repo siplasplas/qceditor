@@ -23,6 +23,9 @@
 #include <QInputDialog>
 #include <QLineEdit>
 #include <QDialogButtonBox>
+#include <QListWidget>
+#include <QVBoxLayout>
+#include <qce/encoding/Encoding.h>
 #include <QPushButton>
 #include <QRegularExpression>
 #include <QHash>
@@ -146,6 +149,8 @@ MainWindow::MainWindow(const QString& recentFilesPath, QWidget* parent)
     auto* toolsMenu = menuBar()->addMenu(tr("&Tools"));
     toolsMenu->addAction(tr("&Update Syntax Definitions"),
                          this, &MainWindow::updateSyntaxData);
+    toolsMenu->addAction(tr("&Languages of Files Not in UTF-8..."),
+                         this, &MainWindow::chooseLegacyLanguages);
 
     connect(m_tabs, &MruTabWidget::tabAboutToClose,
             this, &MainWindow::onTabAboutToClose, Qt::DirectConnection);
@@ -371,6 +376,48 @@ void MainWindow::updateSyntaxData()
     downloader()->start();
 }
 
+// Only the code pages of the chosen languages are considered for files not in
+// UTF-8: faster, and a few national letters in comments are not misread as
+// another language. None chosen: all languages.
+void MainWindow::chooseLegacyLanguages()
+{
+    const auto languages = qce::encoding::availableLanguages();
+    if (languages.isEmpty()) {
+        QMessageBox::information(this, tr("Languages of Files Not in UTF-8"),
+                                 tr("No language data is available."));
+        return;
+    }
+    QDialog dialog(this);
+    dialog.setWindowTitle(tr("Languages of Files Not in UTF-8"));
+    auto* layout = new QVBoxLayout(&dialog);
+    auto* intro = new QLabel(tr("Files not in UTF-8 are read in a code page of the checked languages "
+                                "(e.g. Polish: cp1250, ISO 8859-2, cp852, …). With none checked, the "
+                                "language is guessed from the text. Applies to files opened from now on."),
+                             &dialog);
+    intro->setWordWrap(true);
+    layout->addWidget(intro);
+    auto* list = new QListWidget(&dialog);
+    const QStringList chosen = EditorTab::legacyLanguages();
+    for (const auto& language : languages) {
+        auto* item = new QListWidgetItem(QStringLiteral("%1 (%2)").arg(language.name, language.code), list);
+        item->setData(Qt::UserRole, language.code);
+        item->setFlags(item->flags() | Qt::ItemIsUserCheckable);
+        item->setCheckState(chosen.contains(language.code) ? Qt::Checked : Qt::Unchecked);
+    }
+    layout->addWidget(list, 1);
+    auto* buttons = new QDialogButtonBox(QDialogButtonBox::Ok | QDialogButtonBox::Cancel, &dialog);
+    layout->addWidget(buttons);
+    connect(buttons, &QDialogButtonBox::accepted, &dialog, &QDialog::accept);
+    connect(buttons, &QDialogButtonBox::rejected, &dialog, &QDialog::reject);
+    dialog.resize(420, 480);
+    if (dialog.exec() != QDialog::Accepted) return;
+    QStringList result;
+    for (int i = 0; i < list->count(); ++i)
+        if (list->item(i)->checkState() == Qt::Checked)
+            result << list->item(i)->data(Qt::UserRole).toString();
+    EditorTab::setLegacyLanguages(result);
+}
+
 EditorTab* MainWindow::currentTab() const
 {
     return tabAt(m_tabs->currentIndex());
@@ -571,7 +618,9 @@ void MainWindow::updateStatusBar(EditorTab* tab)
         : QString());
     m_statusEncoding->setText(encodingText(format));
     m_statusLanguage->setText(tab->languageName());
-    m_statusLanguage->setToolTip(tr("Language detected from the text"));
+    m_statusLanguage->setToolTip(tab->languageConfidence() > 0
+        ? tr("Language detected from the text (%1 %)").arg(qRound(tab->languageConfidence() * 100))
+        : tr("Language detected from the text"));
     m_statusTab->setText(tr("Tab: %1").arg(area->tabWidth()));
 }
 

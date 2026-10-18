@@ -33,6 +33,8 @@ private slots:
     void onCurrentTabChanged(int index);
     void onModificationChanged(bool modified);
     void updateSyntaxData();
+    /// Lets the user choose the languages of files not in UTF-8.
+    void chooseLegacyLanguages();
 
 private:
     EditorTab* currentTab() const;

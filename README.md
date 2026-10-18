@@ -64,6 +64,13 @@ reopens the file in the chosen one (asking first about unsaved edits). **Keep**,
 or editing the text, closes the bar. **Encoding > Reopen with Encoding** in the
 context menu lists the same encodings with their probability at the top.
 
+**Tools > Languages of Files Not in UTF-8…** checks the languages such files are
+written in (e.g. Polish and Czech): only their code pages are then considered,
+which is faster and makes detection surer. With none checked the language is
+guessed from the text. The choice is saved in `~/.config/siplasplas/qceditor.conf`
+and applies to files opened afterwards. The language field of the status bar
+shows the detected language's probability in its tooltip.
+
 The status bar shows `line:column`, the line breaks (**Unix (LF)**,
 **Windows (CRLF)**, **Mac (CR)** or **Mixed**), the encoding (**UTF-8**,
 **UTF-8 BOM** or the code page), the text's language, and the tab width. The
