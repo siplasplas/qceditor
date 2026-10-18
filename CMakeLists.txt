@@ -9,20 +9,30 @@ set(CMAKE_AUTORCC ON)
 
 include(GNUInstallDirs)
 
+# A program that fetches qceditor for its editor library (e.g.
+# gemini-commander) does not build the application.
+option(QCEDITOR_BUILD_APP "Build the QCEditor application" ${PROJECT_IS_TOP_LEVEL})
+
 find_package(Qt6 6.2 REQUIRED COMPONENTS Core Gui Widgets)
+# Targets a parent project already has (e.g. fetched) are not looked for again.
 # 2.7: qxMigrateToSiplasplas() moves older versions' files at start-up
-find_package(qt-extra 2.7 REQUIRED)
+if(NOT TARGET qt-extra)
+    find_package(qt-extra 2.7 REQUIRED)
+endif()
 # 1.13: Kate data in ~/.local/share/kate-data, qce::kate::migrateDataRoot()
 # 1.14: encoding detection with confidence, alternatives and preview
 # 1.15.1: spell checking (qcodeedit-spell, hunspell), CodeEditArea::cursorAt()
 # 1.17: insertText(), createStandardContextMenu()
 # 1.19: qcodeedit-diff, a reload changes only the differing lines as an undo step
-find_package(qcodeedit 1.19.0 REQUIRED)
-find_package(qcodeedit-kate 1.19.0 REQUIRED)
-find_package(qcodeedit-katedata 1.19.0 REQUIRED)
-find_package(qcodeedit-encoding 1.19.0 REQUIRED)
-find_package(qcodeedit-spell 1.19.0 REQUIRED)
-find_package(qcodeedit-diff 1.19.0 REQUIRED)
+foreach(package qcodeedit qcodeedit-kate qcodeedit-katedata qcodeedit-encoding qcodeedit-spell qcodeedit-diff)
+    string(REPLACE "qcodeedit-" "" component ${package})
+    if(package STREQUAL "qcodeedit")
+        set(component qcodeedit)
+    endif()
+    if(NOT TARGET qcodeedit::${component})
+        find_package(${package} 1.19.0 REQUIRED)
+    endif()
+endforeach()
 
 # The editor itself, shared with other programs (e.g. gemini-commander).
 add_subdirectory(editor)
@@ -30,14 +40,15 @@ add_subdirectory(editor)
 # The application: a thin layer over the editor library (its window, plus
 # moving older versions' files and keeping the recent files in its data
 # directory).
-add_executable(qceditor src/main.cpp)
-target_compile_definitions(qceditor PRIVATE QCEDITOR_VERSION="${PROJECT_VERSION}")
-
-target_link_libraries(qceditor PRIVATE
-    Qt6::Core
-    Qt6::Gui
-    Qt6::Widgets
-    qt-extra
-    qceditor::editor
-    qcodeedit::katedata
-)
+if(QCEDITOR_BUILD_APP)
+    add_executable(qceditor src/main.cpp)
+    target_compile_definitions(qceditor PRIVATE QCEDITOR_VERSION="${PROJECT_VERSION}")
+    target_link_libraries(qceditor PRIVATE
+        Qt6::Core
+        Qt6::Gui
+        Qt6::Widgets
+        qt-extra
+        qceditor::editor
+        qcodeedit::katedata
+    )
+endif()

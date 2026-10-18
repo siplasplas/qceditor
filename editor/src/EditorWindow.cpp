@@ -498,17 +498,17 @@ void EditorWindow::closeEvent(QCloseEvent* event)
 
 // --- Window title and status bar ---------------------------------------------
 
+// Qt adds the application's display name, when the program has set one.
 void EditorWindow::updateWindowTitle()
 {
-    const QString application = QGuiApplication::applicationDisplayName();
     EditorTab* tab = currentTab();
     if (!tab) {
-        setWindowTitle(application);
+        setWindowTitle(QString());
         return;
     }
     QString title = tab->filePath().isEmpty() ? tab->property(kTitleProperty).toString() : tab->filePath();
     if (tab->isModified()) title += QStringLiteral(" *");
-    setWindowTitle(application.isEmpty() ? title : QStringLiteral("%1 — %2").arg(title, application));
+    setWindowTitle(title);
 }
 
 // Line and column, the column in characters (code points) as Go to takes it.

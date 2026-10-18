@@ -59,7 +59,8 @@ public:
     /// at the end of a line.
     QString codePointAtCursor() const;
 
-    /// Opens a file; the undo history starts anew.
+    /// Opens a file; the undo history starts anew. A path that does not exist
+    /// yet gives an empty UTF-8 document saved under it.
     bool loadFile(const QString& path);
     bool hasExternalChanges() const;
     /// Takes the file as it is on disk now as the known version, so that

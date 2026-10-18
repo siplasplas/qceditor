@@ -50,6 +50,11 @@ find_package(qceditor 1.1 REQUIRED)
 target_link_libraries(my_app PRIVATE qceditor::editor)
 ```
 
+A program may also fetch qceditor (FetchContent) instead; with
+`QCEDITOR_BUILD_APP=OFF` (the default when qceditor is not the top-level
+project) only the library is built. `EditorWindow::openFile()` with a path
+that does not exist yet opens an empty document saved there.
+
 Each program keeps the editor's settings in its own place: it passes its own
 `qceditor::Settings` to `qceditor::setSettings()`; without it the editor uses
 the application's QSettings.

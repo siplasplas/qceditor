@@ -672,7 +672,31 @@ void EditorTab::onDocumentChanged()
 
 bool EditorTab::loadFile(const QString& path)
 {
-    return readFile(path, true);
+    if (QFileInfo::exists(path))
+        return readFile(path, true);
+    // A name that does not exist yet (e.g. a new file named in a file manager):
+    // an empty UTF-8 document, saved there.
+    m_doc->setText(QString());
+    m_edit->area()->undoStack()->clear();
+    {
+        const QSignalBlocker block(m_encoding);
+        m_encoding->setFormat({QStringLiteral("utf8"), false, false, true});
+    }
+    hideEncodingNotice();
+    m_uncertain = {};
+    m_language = {};
+    ++m_languageRequest;
+    m_filePath = path;
+    m_diskModified = {};
+    m_diskSize = -1;
+    m_formatChanged = false;
+    m_syntaxMode = SyntaxMode::Automatic;
+    m_syntaxFile.clear();
+    reapplyHighlighter();
+    emit statusChanged();
+    m_reportedModified = false;
+    emit modificationChanged(false);
+    return true;
 }
 
 bool EditorTab::hasExternalChanges() const

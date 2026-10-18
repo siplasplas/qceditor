@@ -68,6 +68,12 @@ public:
     /// user cancelled.
     bool closeAllTabs();
 
+    /// Compares the open files with the disk now: unmodified tabs whose file
+    /// changed are reloaded (an undo step); a modified one asks or is left
+    /// alone (Tools > Ask to Reload Modified Files). Done by itself when the
+    /// window becomes active and every second while it is.
+    void checkExternalChanges();
+
 signals:
     /// A tab was saved (e.g. to apply a configuration file).
     void tabSaved(EditorTab* tab, const QString& path);
@@ -92,7 +98,6 @@ private:
     void onTabAboutToClose(QWidget* page, bool askPin, bool& allowClose);
     void onTabLimitReached(QWidget* page, MruTabWidget::LimitAction& action);
     void extendTabContextMenu(QWidget* page, QMenu* menu);
-    void checkExternalChanges();
     bool askToReloadModified() const;
     void openFileDialog();
     void chooseLegacyLanguages();
