@@ -4,7 +4,7 @@ Editor that uses qcodeedit and the shared MruTabWidget from qt-extra.
 
 ## Building
 
-Requires C++17, CMake 3.16+, Qt 6.2+, installed qcodeedit 1.13.0 packages
+Requires C++17, CMake 3.16+, Qt 6.2+, installed qcodeedit 1.14.0 packages
 (`qcodeedit`, `qcodeedit-kate`, `qcodeedit-katedata`, `qcodeedit-encoding`,
 the last one with [cpg](https://github.com/siplasplas/cpg)) and qt-extra 2.7 or
 later (moving older versions' files, see below).
@@ -53,6 +53,16 @@ as cp1250, ISO 8859-2 or cp852, detected automatically. They are saved in the
 same encoding, keeping BOM, line breaks (Windows CRLF, Unix LF or classic Mac
 CR) and the final line break; a file with mixed line breaks is saved with its
 most frequent kind.
+
+When detection is not confident (a few national letters are little evidence),
+the file still opens at once in the most likely encoding, and a bar above the
+editor says so, e.g. "Encoding uncertain: cp1250 73 %, amiga-fat 24 %".
+**Choose…** opens a dialog listing the plausible encodings with their language
+and probability, and a preview of the lines where they decode the file
+differently; **Other encoding** adds any encoding to the comparison, and OK
+reopens the file in the chosen one (asking first about unsaved edits). **Keep**,
+or editing the text, closes the bar. **Encoding > Reopen with Encoding** in the
+context menu lists the same encodings with their probability at the top.
 
 The status bar shows `line:column`, the line breaks (**Unix (LF)**,
 **Windows (CRLF)**, **Mac (CR)** or **Mixed**), the encoding (**UTF-8**,

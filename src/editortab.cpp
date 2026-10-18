@@ -1,5 +1,10 @@
 #include "editortab.h"
 #include "findbar.h"
+#include "encodingchoicedialog.h"
+#include <QFrame>
+#include <QHBoxLayout>
+#include <QLabel>
+#include <QPushButton>
 #include <QVBoxLayout>
 #include <QFile>
 #include <QTextStream>
@@ -64,6 +69,29 @@ EditorTab::EditorTab(QWidget* parent)
     layout->setSpacing(0);
     m_findBar = new FindBar(this);
     layout->addWidget(m_findBar);
+
+    // Non-modal notice when the encoding was guessed without confidence: the
+    // file is already open with the most likely one.
+    m_encodingNotice = new QFrame(this);
+    m_encodingNotice->setFrameShape(QFrame::StyledPanel);
+    m_encodingNotice->setAutoFillBackground(true);
+    QPalette noticePalette = m_encodingNotice->palette();
+    noticePalette.setColor(QPalette::Window, noticePalette.color(QPalette::ToolTipBase));
+    noticePalette.setColor(QPalette::WindowText, noticePalette.color(QPalette::ToolTipText));
+    m_encodingNotice->setPalette(noticePalette);
+    auto* noticeLayout = new QHBoxLayout(m_encodingNotice);
+    noticeLayout->setContentsMargins(8, 3, 4, 3);
+    m_encodingNoticeText = new QLabel(m_encodingNotice);
+    noticeLayout->addWidget(m_encodingNoticeText, 1);
+    auto* choose = new QPushButton(tr("Choose…"), m_encodingNotice);
+    auto* keep = new QPushButton(tr("Keep"), m_encodingNotice);
+    noticeLayout->addWidget(choose);
+    noticeLayout->addWidget(keep);
+    connect(choose, &QPushButton::clicked, this, &EditorTab::chooseEncoding);
+    connect(keep, &QPushButton::clicked, this, &EditorTab::hideEncodingNotice);
+    m_encodingNotice->hide();
+    layout->addWidget(m_encodingNotice);
+
     layout->addWidget(m_edit);
 
     connect(m_doc, &qce::SimpleTextDocument::linesChanged,
@@ -233,34 +261,79 @@ void EditorTab::addEncodingMenu(QMenu& menu)
     const QString current = encoding();
     auto* encodingMenu = menu.addMenu(tr("Encoding: %1").arg(current));
 
-    auto fill = [&](QMenu* target, const std::function<void(const QString&)>& apply) {
+    auto fill = [&](QMenu* target, bool withDetection, const std::function<void(const QString&)>& apply) {
         auto* group = new QActionGroup(target);
-        auto add = [&](QMenu* parent, const QString& name) {
-            auto* action = parent->addAction(name);
+        auto add = [&](QMenu* parent, const QString& name, const QString& text) {
+            auto* action = parent->addAction(text);
             action->setCheckable(true);
             action->setChecked(name == current);
             group->addAction(action);
             connect(action, &QAction::triggered, this, [apply, name]() { apply(name); });
         };
-        for (const QString& name : common) add(target, name);
+        // When detection was not sure: its options with their probability first.
+        if (withDetection && !m_uncertain.options.isEmpty()) {
+            for (const auto& option : m_uncertain.options) {
+                QString text = option.encoding;
+                const QString language = qce::encoding::languageName(option.language);
+                if (!language.isEmpty()) text += QStringLiteral(" — ") + language;
+                text += QStringLiteral(" — %1 %").arg(qRound(option.confidence * 100));
+                add(target, option.encoding, text);
+            }
+            target->addSeparator();
+        }
+        for (const QString& name : common) add(target, name, name);
         auto* more = target->addMenu(tr("More"));
         for (const QString& name : qce::encoding::availableEncodings())
-            if (!common.contains(name)) add(more, name);
+            if (!common.contains(name)) add(more, name, name);
     };
 
-    fill(encodingMenu->addMenu(tr("Reopen with Encoding")), [this](const QString& name) {
-        if (m_filePath.isEmpty()) return;
-        if (m_modified && QMessageBox::question(this, tr("Reopen with Encoding"),
-                tr("Discard unsaved edits and read the file again as %1?").arg(name))
-                != QMessageBox::Yes)
-            return;
-        if (!reopenWithEncoding(name))
-            QMessageBox::warning(this, tr("Reopen with Encoding"),
-                                 tr("The file cannot be read as %1.").arg(name));
-    });
-    fill(encodingMenu->addMenu(tr("Save with Encoding")), [this](const QString& name) {
+    fill(encodingMenu->addMenu(tr("Reopen with Encoding")), true,
+         [this](const QString& name) { reopenAsking(name); });
+    fill(encodingMenu->addMenu(tr("Save with Encoding")), false, [this](const QString& name) {
         setSaveEncoding(name);
     });
+}
+
+void EditorTab::reopenAsking(const QString& name)
+{
+    if (m_filePath.isEmpty()) return;
+    if (m_modified && QMessageBox::question(this, tr("Reopen with Encoding"),
+            tr("Discard unsaved edits and read the file again as %1?").arg(name))
+            != QMessageBox::Yes)
+        return;
+    if (!reopenWithEncoding(name))
+        QMessageBox::warning(this, tr("Reopen with Encoding"),
+                             tr("The file cannot be read as %1.").arg(name));
+}
+
+void EditorTab::showEncodingNotice()
+{
+    QStringList options;
+    for (const auto& option : m_uncertain.options)
+        options << QStringLiteral("%1 %2 %").arg(option.encoding).arg(qRound(option.confidence * 100));
+    m_encodingNoticeText->setText(tr("Encoding uncertain: %1").arg(options.join(QStringLiteral(", "))));
+    m_encodingNoticeText->setToolTip(tr("The file is shown as %1, the most likely encoding. "
+                                        "Choose… compares the encodings on the lines where they differ.")
+                                         .arg(m_uncertain.options.value(0).encoding));
+    m_encodingNotice->show();
+}
+
+void EditorTab::hideEncodingNotice()
+{
+    m_encodingNotice->hide();
+}
+
+void EditorTab::chooseEncoding()
+{
+    QFile file(m_filePath);
+    if (m_filePath.isEmpty() || !file.open(QIODevice::ReadOnly)) return;
+    const QByteArray bytes = file.readAll();
+    // The options as detected on opening; detect again if the file has none.
+    QList<qce::encoding::EncodingOption> options = m_uncertain.options;
+    if (options.isEmpty()) options = qce::encoding::detectEncoding(bytes).options;
+    EncodingChoiceDialog dialog(bytes, options, encoding(), m_edit->area()->font(), this);
+    if (dialog.exec() != QDialog::Accepted || dialog.chosenEncoding().isEmpty()) return;
+    reopenAsking(dialog.chosenEncoding());
 }
 
 qce::encoding::FileFormat EditorTab::fileFormat() const
@@ -285,6 +358,8 @@ void EditorTab::setSaveEncoding(const QString& encoding)
 
 void EditorTab::onDocumentChanged()
 {
+    // Editing keeps the encoding the file is shown in.
+    hideEncodingNotice();
     if (!m_modified) {
         m_modified = true;
         emit modificationChanged(true);
@@ -341,6 +416,15 @@ bool EditorTab::readFile(const QString& path, bool resetSyntax, const QString& e
     // Code page or UTF, detected unless given; saved back the same way.
     const auto decoded = qce::encoding::decode(bytes, encoding);
     if (!decoded.ok) return false;
+    // Detected without confidence: shown with the most likely encoding at once,
+    // and a notice offers the choice. A given encoding (chosen, or kept on
+    // reload) keeps the options for the Reopen menu but needs no notice.
+    if (encoding.isEmpty())
+        m_uncertain = decoded.detection.confident ? qce::encoding::EncodingDetection() : decoded.detection;
+    if (encoding.isEmpty() && !m_uncertain.options.isEmpty())
+        showEncodingNotice();
+    else
+        hideEncodingNotice();
 
     disconnect(m_doc, nullptr, this, nullptr);
     m_doc->setText(decoded.text);

@@ -11,16 +11,18 @@ find_package(Qt6 6.2 REQUIRED COMPONENTS Core Gui Widgets)
 # 2.7: qxMigrateToSiplasplas() moves older versions' files at start-up
 find_package(qt-extra 2.7 REQUIRED)
 # 1.13: Kate data in ~/.local/share/kate-data, qce::kate::migrateDataRoot()
-find_package(qcodeedit 1.13.0 REQUIRED)
-find_package(qcodeedit-kate 1.13.0 REQUIRED)
-find_package(qcodeedit-katedata 1.13.0 REQUIRED)
-find_package(qcodeedit-encoding 1.13.0 REQUIRED)
+# 1.14: encoding detection with confidence, alternatives and preview
+find_package(qcodeedit 1.14.0 REQUIRED)
+find_package(qcodeedit-kate 1.14.0 REQUIRED)
+find_package(qcodeedit-katedata 1.14.0 REQUIRED)
+find_package(qcodeedit-encoding 1.14.0 REQUIRED)
 
 set(SOURCES
     src/main.cpp
     src/mainwindow.cpp
     src/findbar.cpp
     src/editortab.cpp
+    src/encodingchoicedialog.cpp
     src/syntaxdata.cpp
 )
 
@@ -29,6 +31,7 @@ set(HEADERS
     src/replacecommand.h
     src/findbar.h
     src/editortab.h
+    src/encodingchoicedialog.h
     src/syntaxdata.h
 )
 
