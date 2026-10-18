@@ -108,8 +108,13 @@ SpellingReviewDialog::SpellingReviewDialog(const QList<SpellingReviewItem>& item
     // in sight until then.
     connect(m_onlyChecked, &QCheckBox::toggled, this, &SpellingReviewDialog::filter);
 
+    auto* status = new QHBoxLayout;
     m_summary = new QLabel(this);
-    layout->addWidget(m_summary);
+    status->addWidget(m_summary);
+    status->addStretch();
+    m_searchTime = new QLabel(this);
+    status->addWidget(m_searchTime);
+    layout->addLayout(status);
 
     auto* buttons = new QDialogButtonBox(QDialogButtonBox::Ok | QDialogButtonBox::Cancel, this);
     buttons->button(QDialogButtonBox::Ok)->setText(tr("&Correct"));
@@ -142,6 +147,14 @@ QList<QPair<SpellingReviewItem::Range, QString>> SpellingReviewDialog::chosenRep
         result.append({item.choices[index].range, item.choices[index].replacement});
     }
     return result;
+}
+
+void SpellingReviewDialog::setSearchTime(qint64 milliseconds)
+{
+    const double perWord = m_items.isEmpty() ? 0 : double(milliseconds) / double(m_items.size());
+    m_searchTime->setText(tr("Corrections found in %1 s, %2 ms a word")
+                              .arg(double(milliseconds) / 1000.0, 0, 'f', 2)
+                              .arg(perWord, 0, 'f', 1));
 }
 
 void SpellingReviewDialog::checkAtFirst()

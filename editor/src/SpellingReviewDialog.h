@@ -44,6 +44,8 @@ public:
 
     /// The checked words with the chosen corrections.
     QList<QPair<SpellingReviewItem::Range, QString>> chosenReplacements() const;
+    /// How long finding the corrections took, shown with the time a word.
+    void setSearchTime(qint64 milliseconds);
 
 private:
     void updateSummary();
@@ -57,6 +59,7 @@ private:
     QLabel* m_summary = nullptr;
     QComboBox* m_checkAtFirst = nullptr;
     QCheckBox* m_onlyChecked = nullptr;
+    QLabel* m_searchTime = nullptr;
 };
 
 } // namespace qceditor

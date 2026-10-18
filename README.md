@@ -154,7 +154,11 @@ corrections only (a single suggestion close to the word, e.g. "bhyc" → być, n
 "agents" → agent), the words with a single suggestion, close or not, or every
 word with its first correction (remembered); the
 others are checked by hand (picking another correction checks the word too).
-**Show only checked words** hides the rest, to look over what will change. **Correct** replaces the
+**Show only checked words** hides the rest, to look over what will change. The
+window says how long finding the corrections took (seconds, and milliseconds a
+word): **Tools > Hunspell Suggestions** adds hunspell's own suggestions always,
+or only when the dictionary's forms give none, about four times faster with
+the same results on a test list. **Correct** replaces the
 checked words, all of them one undo step; nothing changes without it.
 **Tools > Correct Spelling While Typing** (off by default, remembered) corrects
 a misspelled word with a sure correction as soon as a space or punctuation is

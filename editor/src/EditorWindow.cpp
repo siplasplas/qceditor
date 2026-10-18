@@ -249,6 +249,20 @@ void EditorWindow::createMenus()
         EditorTab::setCorrectWhileTyping(on);
         forEachTab([](EditorTab* tab) { tab->updateSpellChecking(); });
     });
+    // Hunspell's suggestions take most of the time of finding corrections.
+    auto* hunspellMenu = m_toolsMenu->addMenu(tr("&Hunspell Suggestions"));
+    auto* hunspellChoices = new QActionGroup(hunspellMenu);
+    for (const bool always : {true, false}) {
+        QAction* action = hunspellMenu->addAction(always ? tr("&Always (slower)")
+                                                         : tr("Only When &None Found (faster)"));
+        action->setCheckable(true);
+        action->setChecked(EditorTab::hunspellSuggestionsAlways() == always);
+        hunspellChoices->addAction(action);
+        connect(action, &QAction::triggered, this, [this, always]() {
+            EditorTab::setHunspellSuggestionsAlways(always);
+            forEachTab([](EditorTab* tab) { tab->updateSpellChecking(); });
+        });
+    }
     // The selection's misspelled words, or the whole text's, to confirm their corrections.
     addAction(m_toolsMenu, tr("&Review Spelling..."), QKeySequence(Qt::Key_F7), [this]() {
         if (auto* tab = currentTab()) tab->reviewSpelling();

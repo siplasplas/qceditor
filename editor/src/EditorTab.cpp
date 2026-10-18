@@ -36,6 +36,7 @@
 #include "EenFile.h"
 #include "SpellingReviewDialog.h"
 #include <QHash>
+#include <QElapsedTimer>
 #include <QProgressDialog>
 #include <algorithm>
 #include <functional>
@@ -90,6 +91,9 @@ EditorTab::EditorTab(QWidget* parent)
     m_spelling = new qce::spell::CodeEditSpelling(m_edit->area(), this);
     m_spelling->setEnabled(spellCheckingEnabled());
     m_spelling->setCorrectWhileTyping(correctWhileTyping());
+    m_spelling->setHunspellSuggestions(hunspellSuggestionsAlways()
+                                           ? qce::spell::SpellChecker::HunspellSuggestions::Always
+                                           : qce::spell::SpellChecker::HunspellSuggestions::WhenNoneFound);
     connect(m_spelling, &qce::spell::CodeEditSpelling::corrected, this,
             [this](const QString& typed, const QString& correction) {
         emit message(tr("Corrected \"%1\" to \"%2\"; Ctrl+Z brings it back").arg(typed, correction));
@@ -607,6 +611,7 @@ void EditorTab::addEncodingMenu(QMenu& menu)
 static const char* kSpellingEnabledKey = "spelling/enabled";
 static const char* kRecentSpellingKey = "spelling/recentDictionaries";
 static const char* kCorrectWhileTypingKey = "spelling/correctWhileTyping";
+static const char* kHunspellSuggestionsKey = "spelling/hunspellSuggestions";
 static constexpr int kRecentSpellingCount = 6;
 
 bool EditorTab::spellCheckingEnabled()
@@ -629,10 +634,23 @@ void EditorTab::setCorrectWhileTyping(bool correct)
     settings().setValue(kCorrectWhileTypingKey, correct);
 }
 
+bool EditorTab::hunspellSuggestionsAlways()
+{
+    return settings().value(kHunspellSuggestionsKey, QStringLiteral("always")).toString() != QLatin1String("whenNoneFound");
+}
+
+void EditorTab::setHunspellSuggestionsAlways(bool always)
+{
+    settings().setValue(kHunspellSuggestionsKey, always ? QStringLiteral("always") : QStringLiteral("whenNoneFound"));
+}
+
 void EditorTab::updateSpellChecking()
 {
     m_spelling->setEnabled(spellCheckingEnabled());
     m_spelling->setCorrectWhileTyping(correctWhileTyping());
+    m_spelling->setHunspellSuggestions(hunspellSuggestionsAlways()
+                                           ? qce::spell::SpellChecker::HunspellSuggestions::Always
+                                           : qce::spell::SpellChecker::HunspellSuggestions::WhenNoneFound);
     emit spellingDictionariesChanged();
 }
 
@@ -748,6 +766,8 @@ void EditorTab::reviewSpelling()
     QProgressDialog progress(tr("Looking for corrections…"), tr("Cancel"), 0, int(words.size()), this);
     progress.setWindowModality(Qt::WindowModal);
     progress.setMinimumDuration(500);
+    QElapsedTimer searching;
+    searching.start();
     QHash<QString, QList<qce::spell::SpellChecker::Suggestion>> suggestions;
     QList<SpellingReviewItem> items;
     for (int i = 0; i < words.size(); ++i) {
@@ -770,6 +790,7 @@ void EditorTab::reviewSpelling()
     }
     progress.setValue(int(words.size()));
     SpellingReviewDialog dialog(items, inSelection, this);
+    dialog.setSearchTime(searching.elapsed());
     if (dialog.exec() != QDialog::Accepted) return;
     const auto chosen = dialog.chosenReplacements();
     if (chosen.isEmpty()) return;
