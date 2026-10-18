@@ -754,7 +754,7 @@ void EditorTab::reviewSpelling()
         progress.setValue(i);
         if (progress.wasCanceled()) return;
         const auto& word = words[i];
-        SpellingReviewItem item{word, m_doc->lineAt(word.start.line), {}, false};
+        SpellingReviewItem item{word, m_doc->lineAt(word.start.line), {}, false, false};
         auto found = suggestions.find(word.word);
         if (found == suggestions.end())
             found = suggestions.insert(word.word, m_spelling->scoredSuggestions(word.word, 3));
@@ -763,8 +763,9 @@ void EditorTab::reviewSpelling()
         for (const auto& phrase : phrases)
             item.choices.append({phrase.range, phrase.replacement,
                                  spaceCorrectionText(phrase.range.word, phrase.replacement)});
-        // Sure: a single close suggestion and no moved space instead.
-        item.confident = phrases.isEmpty() && qce::spell::SpellChecker::isConfident(word.word, found.value());
+        // Single: one suggestion and no moved space instead; sure: and close.
+        item.single = phrases.isEmpty() && found.value().size() == 1;
+        item.confident = item.single && qce::spell::SpellChecker::isConfident(word.word, found.value());
         items.append(item);
     }
     progress.setValue(int(words.size()));

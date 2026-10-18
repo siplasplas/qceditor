@@ -26,12 +26,13 @@ struct SpellingReviewItem
     QString lineText;
     QList<Choice> choices;    ///< best first; a moved space after the word's own suggestions
     bool confident = false;   ///< a single close suggestion (SpellChecker::isConfident())
+    bool single = false;      ///< a single suggestion and no moved space, close or not
 };
 
 /// The misspelled words of the text or the selection, each with a correction
 /// to choose. Checked at first: the sure corrections (a single close
-/// suggestion), or every word with its first correction (the choice is
-/// remembered); the user checks
+/// suggestion), the words with a single suggestion, or every word with its
+/// first correction (the choice is remembered); the user checks
 /// or unchecks the others (and may pick another correction), and can show
 /// only the checked words to look them over. The checked ones are replaced
 /// together (CodeEditSpelling::replaceWords(), one undo step).

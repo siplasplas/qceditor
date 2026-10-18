@@ -151,7 +151,8 @@ turns this on or off. Without the lists suggestions work as before.
 or of the whole text, with a correction for each, their line and context.
 **Checked at first** chooses which words are checked when it opens: the sure
 corrections only (a single suggestion close to the word, e.g. "bhyc" → być, not
-"agents" → agent), or every word with its first correction (remembered); the
+"agents" → agent), the words with a single suggestion, close or not, or every
+word with its first correction (remembered); the
 others are checked by hand (picking another correction checks the word too).
 **Show only checked words** hides the rest, to look over what will change. **Correct** replaces the
 checked words, all of them one undo step; nothing changes without it.

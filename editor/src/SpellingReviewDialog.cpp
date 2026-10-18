@@ -18,8 +18,10 @@ namespace {
 
 enum Column { WordColumn, CorrectionColumn, LineColumn, ContextColumn };
 
-// Whether every word is checked at first, not only those with a single correction.
-const char* kCheckAllKey = "spelling/reviewChecksEveryWord";
+// What is checked at first: "sure" corrections, words with a "single"
+// suggestion, or "every" word with its first one.
+const char* kCheckedAtFirstKey = "spelling/reviewCheckedAtFirst";
+const QStringList kCheckedAtFirstValues = {QStringLiteral("sure"), QStringLiteral("single"), QStringLiteral("every")};
 
 // The line around the word, shortened at both ends.
 QString context(const QString& line, int start, int end)
@@ -52,8 +54,12 @@ SpellingReviewDialog::SpellingReviewDialog(const QList<SpellingReviewItem>& item
     options->addWidget(new QLabel(tr("Checked at first:"), this));
     m_checkAtFirst = new QComboBox(this);
     m_checkAtFirst->addItem(tr("Sure corrections only"));
+    m_checkAtFirst->addItem(tr("Words with a single suggestion"));
     m_checkAtFirst->addItem(tr("Every word, with its first correction"));
-    m_checkAtFirst->setCurrentIndex(settings().value(kCheckAllKey, false).toBool() ? 1 : 0);
+    m_checkAtFirst->setItemData(0, tr("A single suggestion close to the word, e.g. \"bhyc\" → być"), Qt::ToolTipRole);
+    m_checkAtFirst->setItemData(1, tr("Also when it is not that close, e.g. \"agents\" → agent"), Qt::ToolTipRole);
+    m_checkAtFirst->setCurrentIndex(
+        qMax(0, int(kCheckedAtFirstValues.indexOf(settings().value(kCheckedAtFirstKey).toString()))));
     options->addWidget(m_checkAtFirst);
     options->addStretch();
     m_onlyChecked = new QCheckBox(tr("Show &only checked words"), this);
@@ -94,7 +100,7 @@ SpellingReviewDialog::SpellingReviewDialog(const QList<SpellingReviewItem>& item
     checkAtFirst();
     connect(m_list, &QTreeWidget::itemChanged, this, &SpellingReviewDialog::updateSummary);
     connect(m_checkAtFirst, &QComboBox::activated, this, [this](int index) {
-        settings().setValue(kCheckAllKey, index == 1);
+        settings().setValue(kCheckedAtFirstKey, kCheckedAtFirstValues.value(index));
         checkAtFirst();
         filter();
     });
@@ -140,12 +146,13 @@ QList<QPair<SpellingReviewItem::Range, QString>> SpellingReviewDialog::chosenRep
 
 void SpellingReviewDialog::checkAtFirst()
 {
-    const bool every = m_checkAtFirst->currentIndex() == 1;
+    const int mode = m_checkAtFirst->currentIndex();
     for (int i = 0; i < m_list->topLevelItemCount(); ++i) {
         QTreeWidgetItem* row = m_list->topLevelItem(i);
         if (!(row->flags() & Qt::ItemIsUserCheckable)) continue;
         const SpellingReviewItem& item = m_items[row->data(WordColumn, Qt::UserRole).toInt()];
-        row->setCheckState(WordColumn, every || item.confident ? Qt::Checked : Qt::Unchecked);
+        const bool check = mode == 2 || (mode == 1 && item.single) || item.confident;
+        row->setCheckState(WordColumn, check ? Qt::Checked : Qt::Unchecked);
         if (auto* choice = qobject_cast<QComboBox*>(m_list->itemWidget(row, CorrectionColumn)))
             choice->setCurrentIndex(0);
     }
