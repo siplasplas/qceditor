@@ -5,6 +5,7 @@
 
 #include <qxfiledialog.h>
 
+#include <QActionGroup>
 #include <QApplication>
 #include <QClipboard>
 #include <QCloseEvent>
@@ -233,6 +234,19 @@ void EditorWindow::createMenus()
     askReload->setToolTip(tr("A file with unsaved edits that changed on disk asks whether to load the "
                              "disk version; otherwise it is left as it is"));
     connect(askReload, &QAction::toggled, this, [](bool ask) { settings().setValue(kAskReloadKey, ask); });
+    // Never in the line with the cursor; one undo step.
+    auto* trimMenu = m_toolsMenu->addMenu(tr("&Remove Trailing Whitespace on Save"));
+    auto* trimChoices = new QActionGroup(trimMenu);
+    const auto addTrim = [&](const QString& text, EditorTab::TrimWhitespace mode) {
+        QAction* action = trimMenu->addAction(text);
+        action->setCheckable(true);
+        action->setChecked(EditorTab::trimWhitespace() == mode);
+        trimChoices->addAction(action);
+        connect(action, &QAction::triggered, this, [mode]() { EditorTab::setTrimWhitespace(mode); });
+    };
+    addTrim(tr("&Never"), EditorTab::TrimWhitespace::Off);
+    addTrim(tr("In &Changed Lines"), EditorTab::TrimWhitespace::ChangedLines);
+    addTrim(tr("In &All Lines"), EditorTab::TrimWhitespace::AllLines);
 
     m_helpMenu = menuBar()->addMenu(tr("&Help"));
     m_helpMenu->addAction(tr("&About"), this, &EditorWindow::showAbout);

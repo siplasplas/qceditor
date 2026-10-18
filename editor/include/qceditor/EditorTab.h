@@ -114,11 +114,21 @@ public:
     static QStringList legacyLanguages();
     static void setLegacyLanguages(const QStringList& languages);
 
+    /// Spaces and tabs at the ends of lines removed when saving, as one undo
+    /// step, never in the line with the cursor (Tools > Remove Trailing
+    /// Whitespace on Save; kept in the settings, ChangedLines by default).
+    enum class TrimWhitespace { Off, ChangedLines, AllLines };
+    static TrimWhitespace trimWhitespace();
+    static void setTrimWhitespace(TrimWhitespace mode);
+
     /// Spell checking (Tools > Check Spelling), saved in the settings; on by default.
     static bool spellCheckingEnabled();
     static void setSpellCheckingEnabled(bool enabled);
     /// Applies the setting to this tab.
     void updateSpellChecking();
+    /// The corrections of the misspelled word at the cursor in a menu below
+    /// it, to choose with the keyboard (Ctrl+Enter).
+    void showSpellingCorrections();
     /// Spelling dictionaries chosen for this document (e.g. en_US, pl_PL);
     /// empty = the detected language.
     void setSpellLanguages(const QStringList& dictionaries);
@@ -153,6 +163,8 @@ private:
     bool decryptIfEncrypted(const QString& path, QByteArray* bytes);
     bool askNewPassword();
     void forgetPassword();
+    /// Removes trailing whitespace before saving, as trimWhitespace() says.
+    void trimTrailingWhitespace();
     void addEncodingMenu(QMenu& menu);
     /// Reopens as `encoding`, asking first when there are unsaved edits.
     void reopenAsking(const QString& encoding);
@@ -161,6 +173,9 @@ private:
     /// The dictionaries for this document: chosen, or the detected language.
     void applySpellLanguages();
     void addSpellingMenu(QMenu& menu, const QPoint& position);
+    /// Suggestions, Add to Dictionary and Ignore for the misspelled word at
+    /// `position`; false when there is none.
+    bool addSpellingCorrections(QMenu& menu, qce::TextCursor position);
     void updateDiskStamp();
     void onDocumentChanged();
     void showContextMenu(const QPoint& position);
@@ -209,6 +224,8 @@ private:
     /// Password of an encrypted .een file, kept for saving and reloading.
     QString m_eenPassword;
     bool    m_loadCancelled = false;
+    /// The text as last read or saved, to tell the lines changed since.
+    QString m_savedText;
 };
 
 } // namespace qceditor

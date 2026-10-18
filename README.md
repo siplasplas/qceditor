@@ -73,6 +73,13 @@ The tab bar's context menu also has **Close Unmodified Tabs**, **Copy File
 Name** and **Copy Path**. qt-extra 2.x keeps tab state attached to the page
 when tabs move and provides a built-in pin icon.
 
+**Tools > Remove Trailing Whitespace on Save** removes spaces and tabs at the
+ends of lines when a file is saved: **In Changed Lines** (the default: lines
+changed since the file was opened or last saved, so untouched lines make no
+stray changes, e.g. in git), **In All Lines** or **Never**. The line with the
+cursor is never trimmed (typing on after a space goes on as typed), and the
+removal is one undo step: Ctrl+Z after saving brings the spaces back.
+
 **View > Wrap Lines** (on by default) and **View > Show Special Characters**
 apply to all tabs and are remembered. **Tools > Insert Date**, **Insert Time**
 and **Insert Both Date and Time** insert e.g. `Sunday 2026-10-18` and
@@ -126,6 +133,8 @@ addresses and paths are not checked. Right-clicking a misspelled word offers up
 to 8 suggestions (choosing one replaces the word, undone in one step), **Add to
 Dictionary** (a user dictionary shared with other siplasplas programs,
 `~/.local/share/siplasplas/spell/`) and **Ignore** (this document, this session).
+Ctrl+Enter opens the same choices for the misspelled word at the cursor, below
+it, to pick with the keyboard.
 The language is the detected one; **Spelling Language** in the context menu
 chooses another for the document, from the recently used ones, up to two at
 once (e.g. English + Polish), or **More…** for every dictionary hunspell has

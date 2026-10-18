@@ -32,6 +32,7 @@
 #include <qce/CodePoints.h>
 #include <qce/diff/LineDiff.h>
 #include <QGuiApplication>
+#include <QShortcut>
 #include "EenFile.h"
 #include <algorithm>
 #include <functional>
@@ -86,6 +87,12 @@ EditorTab::EditorTab(QWidget* parent)
     m_spelling = new qce::spell::CodeEditSpelling(m_edit->area(), this);
     m_spelling->setEnabled(spellCheckingEnabled());
     applySpellLanguages();
+    // Ctrl+Enter: the corrections of the word at the cursor, without the mouse.
+    for (const auto key : {Qt::Key_Return, Qt::Key_Enter}) {
+        auto* corrections = new QShortcut(QKeySequence(Qt::CTRL | key), m_edit->area());
+        corrections->setContext(Qt::WidgetShortcut);
+        connect(corrections, &QShortcut::activated, this, &EditorTab::showSpellingCorrections);
+    }
 
     m_lineNumbers = std::make_unique<qce::LineNumberGutter>(m_doc);
     m_lineNumbers->setFont(m_edit->area()->font());
@@ -638,30 +645,47 @@ void EditorTab::applySpellLanguages()
                      .arg(name.isEmpty() ? languages.front() : name, qce::spell::packageHint(languages.front())));
 }
 
-void EditorTab::addSpellingMenu(QMenu& menu, const QPoint& position)
+bool EditorTab::addSpellingCorrections(QMenu& menu, qce::TextCursor position)
+{
+    if (!m_spelling->isEnabled()) return false;
+    const auto word = m_spelling->misspelledWordAt(position);
+    if (!word) return false;
+    const QStringList suggestions = m_spelling->suggestions(word->word, 8);
+    if (suggestions.isEmpty())
+        menu.addAction(tr("No suggestions"))->setEnabled(false);
+    for (const QString& suggestion : suggestions) {
+        auto* action = menu.addAction(QString(suggestion).replace("&", "&&"));
+        connect(action, &QAction::triggered, this, [this, w = *word, suggestion]() {
+            m_spelling->replaceWord(w, suggestion);
+        });
+    }
+    menu.addSeparator();
+    connect(menu.addAction(tr("Add to Dictionary")), &QAction::triggered, this,
+            [this, w = word->word]() { m_spelling->addToDictionary(w); });
+    connect(menu.addAction(tr("Ignore")), &QAction::triggered, this,
+            [this, w = word->word]() { m_spelling->ignore(w); });
+    return true;
+}
+
+// Ctrl+Enter: the corrections of the misspelled word at the cursor, below
+// it, to choose with the keyboard.
+void EditorTab::showSpellingCorrections()
 {
     auto* area = m_edit->area();
-    if (m_spelling->isEnabled()) {
-        // customContextMenuRequested gives the click in the viewport's coordinates.
-        const auto word = m_spelling->misspelledWordAt(area->cursorAt(position));
-        if (word) {
-            const QStringList suggestions = m_spelling->suggestions(word->word, 8);
-            if (suggestions.isEmpty())
-                menu.addAction(tr("No suggestions"))->setEnabled(false);
-            for (const QString& suggestion : suggestions) {
-                auto* action = menu.addAction(QString(suggestion).replace("&", "&&"));
-                connect(action, &QAction::triggered, this, [this, w = *word, suggestion]() {
-                    m_spelling->replaceWord(w, suggestion);
-                });
-            }
-            menu.addSeparator();
-            connect(menu.addAction(tr("Add to Dictionary")), &QAction::triggered, this,
-                    [this, w = word->word]() { m_spelling->addToDictionary(w); });
-            connect(menu.addAction(tr("Ignore")), &QAction::triggered, this,
-                    [this, w = word->word]() { m_spelling->ignore(w); });
-            menu.addSeparator();
-        }
+    QMenu menu(this);
+    if (!addSpellingCorrections(menu, area->cursorPosition())) {
+        emit message(tr("No misspelled word at the cursor"));
+        return;
     }
+    const QRect caret = area->inputMethodQuery(Qt::ImCursorRectangle).toRect();
+    menu.exec(area->mapToGlobal(caret.bottomLeft()));
+}
+
+void EditorTab::addSpellingMenu(QMenu& menu, const QPoint& position)
+{
+    // customContextMenuRequested gives the click in the viewport's coordinates.
+    if (addSpellingCorrections(menu, m_edit->area()->cursorAt(position)))
+        menu.addSeparator();
 
     // Recent dictionaries and the ones in use; up to two at once.
     auto* languageMenu = menu.addMenu(tr("Spelling Language"));
@@ -709,6 +733,56 @@ void EditorTab::setLegacyLanguages(const QStringList& languages)
 {
     if (languages.isEmpty()) settings().remove(kLegacyLanguagesKey);
     else settings().setValue(kLegacyLanguagesKey, languages);
+}
+
+// "off", "changed" or "all" in the settings.
+static const char* kTrimWhitespaceKey = "editing/trimTrailingWhitespace";
+
+EditorTab::TrimWhitespace EditorTab::trimWhitespace()
+{
+    const QString mode = settings().value(kTrimWhitespaceKey, QStringLiteral("changed")).toString();
+    if (mode == QLatin1String("off")) return TrimWhitespace::Off;
+    if (mode == QLatin1String("all")) return TrimWhitespace::AllLines;
+    return TrimWhitespace::ChangedLines;
+}
+
+void EditorTab::setTrimWhitespace(TrimWhitespace mode)
+{
+    settings().setValue(kTrimWhitespaceKey, mode == TrimWhitespace::Off ? QStringLiteral("off")
+                                            : mode == TrimWhitespace::AllLines ? QStringLiteral("all")
+                                                                               : QStringLiteral("changed"));
+}
+
+// One undo step: the new text goes through setText(), which with
+// qcodeedit-diff changes only the trimmed lines. The cursor's line is left
+// alone, so that typing on after a space goes on as typed.
+void EditorTab::trimTrailingWhitespace()
+{
+    const TrimWhitespace mode = trimWhitespace();
+    if (mode == TrimWhitespace::Off || !qce::lineDiff()) return;
+    QStringList lines = m_doc->toPlainText().split(QLatin1Char('\n'));
+    QVector<bool> trim(lines.size(), mode == TrimWhitespace::AllLines);
+    if (mode == TrimWhitespace::ChangedLines) {
+        // Lines nobody touched keep their whitespace (no stray changes, e.g. in git).
+        const QStringList saved = m_savedText.split(QLatin1Char('\n'));
+        for (const qce::LineChange& change : qce::lineDiff()(saved, lines))
+            for (int i = change.newStart; i < change.newStart + change.newCount && i < lines.size(); ++i)
+                trim[i] = true;
+    }
+    const int cursorLine = m_edit->area()->cursorPosition().line;
+    bool changed = false;
+    for (int i = 0; i < lines.size(); ++i) {
+        if (!trim[i] || i == cursorLine) continue;
+        QString& line = lines[i];
+        int end = int(line.size());
+        while (end > 0 && (line.at(end - 1) == QLatin1Char(' ') || line.at(end - 1) == QLatin1Char('\t')))
+            --end;
+        if (end == line.size()) continue;
+        line.truncate(end);
+        changed = true;
+    }
+    // setText() drops one final line break: the extra one keeps an empty last line.
+    if (changed) m_doc->setText(lines.join(QLatin1Char('\n')) + QLatin1Char('\n'));
 }
 
 void EditorTab::reopenAsking(const QString& name)
@@ -791,6 +865,7 @@ bool EditorTab::loadFile(const QString& path)
     // an empty UTF-8 document, saved there (a .een file asks for a password then).
     forgetPassword();
     m_doc->setText(QString());
+    m_savedText.clear();
     m_edit->area()->undoStack()->clear();
     {
         const QSignalBlocker block(m_encoding);
@@ -871,6 +946,7 @@ bool EditorTab::readFile(const QString& path, bool resetSyntax, const QString& e
     disconnect(m_doc, nullptr, this, nullptr);
     // With qcodeedit-diff only the lines that differ change, as one undo step.
     m_doc->setText(decoded.text);
+    m_savedText = m_doc->toPlainText();
     if (asEdit)
         m_edit->area()->undoStack()->setClean();
     else
@@ -924,6 +1000,7 @@ bool EditorTab::saveAs(const QString& path)
     // In the file's encoding; characters it cannot store bring up a choice
     // (write '?', switch to UTF-8, or cancel the save).
     m_saveCancelled = false;
+    trimTrailingWhitespace();
     QByteArray bytes;
     if (!m_encoding->encodeForSave(m_doc->toPlainText(), &bytes)) {
         m_saveCancelled = true;
@@ -957,6 +1034,7 @@ bool EditorTab::saveAs(const QString& path)
     const bool renamed = path != m_filePath;
     m_filePath = path;
     updateDiskStamp();
+    m_savedText = m_doc->toPlainText();
     m_formatChanged = false;
     m_edit->area()->undoStack()->setClean();
     updateModified();
