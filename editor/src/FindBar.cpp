@@ -171,6 +171,9 @@ void FindBar::showSearch()
             m_scopeEnd = offsetFor(area->selectionEnd());
         }
     }
+    // A read-only tab (e.g. a viewer) only searches.
+    if (area->readOnly()) m_expand->setChecked(false);
+    m_expand->setVisible(!area->readOnly());
     show();
     if (wasHidden && !selection.isEmpty() && !selection.contains('\n')) m_query->setText(selection);
     rebuild(); m_query->setFocus(); m_query->selectAll();
@@ -178,6 +181,7 @@ void FindBar::showSearch()
 void FindBar::showReplace()
 {
     showSearch();
+    if (m_tab->editor()->area()->readOnly()) return;
     m_expand->setChecked(true);
     m_replacement->setFocus(); m_replacement->selectAll();
 }
