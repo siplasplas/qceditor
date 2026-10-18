@@ -165,7 +165,9 @@ word). **Add to Dictionary** and **Ignore** take the selected word out of the
 list, every row of it (an English or coined word written on purpose);
 **Remember Correction** keeps the selected word's chosen correction as your own
 (e.g. "Paypal" → PayPal): from then on it is that word's only suggestion, with
-score 0, so sure, also while typing. **Tools > User Dictionary** (also in the
+score 0, so sure, also while typing; **Own Correction** asks for a correction of
+your own and keeps it the same way, also for a word without suggestions (**Show**
+can list those alone). **Tools > User Dictionary** (also in the
 window) lists your words and corrections, shared with other programs, to remove
 those no longer wanted.
 **Correct** replaces the checked words, all of them one undo step; nothing
