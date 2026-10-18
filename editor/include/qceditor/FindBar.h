@@ -7,6 +7,7 @@ class QLineEdit;
 class QLabel;
 class QToolButton;
 class QPushButton;
+class QShortcut;
 
 namespace qceditor {
 
@@ -24,6 +25,8 @@ public:
 private:
     struct Match { int start; int end; QStringList captures; };
     bool eventFilter(QObject* watched, QEvent* event) override;
+    void showEvent(QShowEvent* event) override;
+    void hideEvent(QHideEvent* event) override;
     void rebuild(bool moveCursor = true);
     void updateHighlights();
     void activate(int index);
@@ -53,6 +56,7 @@ private:
     QToolButton* m_scope;
     QToolButton* m_previous;
     QToolButton* m_next;
+    QShortcut* m_escape = nullptr;
     QVector<Match> m_matches;
     QVector<int> m_lineStarts;
     int m_current = -1;

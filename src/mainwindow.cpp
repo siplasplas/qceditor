@@ -32,6 +32,7 @@
 #include <QHash>
 #include <optional>
 #include <qce/CodeEditArea.h>
+#include <qce/CodePoints.h>
 #include <qce/TextCursor.h>
 #include <qce/kate/KateDataDownloader.h>
 #include <qce/kate/KateSyntaxVersion.h>
@@ -79,8 +80,8 @@ MainWindow::MainWindow(const QString& recentFilesPath, QWidget* parent)
     m_tabs->setTabLimit(20);
     setCentralWidget(m_tabs);
 
-    // Status bar: line:column | line breaks | encoding | language | tab width.
-    for (QLabel** label : {&m_statusPos, &m_statusLineBreaks, &m_statusEncoding,
+    // Status bar: line:column | code point | line breaks | encoding | language | tab width.
+    for (QLabel** label : {&m_statusPos, &m_statusCodePoint, &m_statusLineBreaks, &m_statusEncoding,
                            &m_statusLanguage, &m_statusTab}) {
         *label = new QLabel(this);
         statusBar()->addPermanentWidget(*label);
@@ -277,56 +278,8 @@ void MainWindow::updateRecentFilesMenu()
 
 void MainWindow::goToPosition()
 {
-    auto* tab = currentTab();
-    if (!tab) return;
-    auto* area = tab->editor()->area();
-    const auto cursor = area->cursorPosition();
-    const int lineCount = qMax(1, tab->document()->lineCount());
-    QInputDialog dialog(this);
-    dialog.setWindowTitle(tr("Go to Line/Column"));
-    dialog.setLabelText(tr("Line[:column] (1–%1):").arg(lineCount));
-    // Editable combo: the current position, then positions entered before
-    // (this session only, not saved).
-    QStringList items{QString("%1:%2").arg(cursor.line + 1).arg(cursor.column + 1)};
-    for (const QString& recent : m_recentPositions)
-        if (!items.contains(recent)) items << recent;
-    dialog.setComboBoxItems(items);
-    dialog.setComboBoxEditable(true);
-    dialog.setTextValue(items.first());
-
-    auto position = [tab, lineCount](const QString& text) -> std::optional<qce::TextCursor> {
-        static const QRegularExpression pattern(QStringLiteral("^\\s*([1-9][0-9]*)\\s*(?::\\s*([1-9][0-9]*)\\s*)?$"));
-        const auto match = pattern.match(text);
-        if (!match.hasMatch()) return std::nullopt;
-        bool lineOk = false, columnOk = true;
-        const int line = match.captured(1).toInt(&lineOk);
-        const int column = match.captured(2).isEmpty() ? 1 : match.captured(2).toInt(&columnOk);
-        if (!lineOk || !columnOk || line > lineCount
-            || column > tab->document()->lineAt(line - 1).size() + 1)
-            return std::nullopt;
-        return qce::TextCursor{line - 1, column - 1};
-    };
-    auto validate = [&dialog, position]() {
-        if (auto* buttons = dialog.findChild<QDialogButtonBox*>())
-            buttons->button(QDialogButtonBox::Ok)->setEnabled(position(dialog.textValue()).has_value());
-    };
-    connect(&dialog, &QInputDialog::textValueChanged, &dialog, validate);
-    QTimer::singleShot(0, &dialog, [&dialog, validate]() {
-        if (auto* input = dialog.findChild<QLineEdit*>()) input->selectAll();
-        validate();
-    });
-    if (dialog.exec() != QDialog::Accepted) return;
-    if (const auto target = position(dialog.textValue())) {
-        // Remembered without spaces, most recent first.
-        QString entered = dialog.textValue();
-        entered.remove(QRegularExpression(QStringLiteral("\\s")));
-        m_recentPositions.removeAll(entered);
-        m_recentPositions.prepend(entered);
-        while (m_recentPositions.size() > 20) m_recentPositions.removeLast();
-        tab->revealRange(*target, *target);
-        area->setCursorPosition(*target);
-        area->setFocus();
-    }
+    if (auto* tab = currentTab())
+        tab->goToPosition();
 }
 
 qce::kate::KateDataDownloader* MainWindow::downloader()
@@ -452,9 +405,9 @@ EditorTab* MainWindow::createTab(const QString& title)
             this, &MainWindow::onModificationChanged);
 
     connect(tab->editor()->area(), &qce::CodeEditArea::cursorPositionChanged,
-            this, [this, tab](qce::TextCursor c) {
+            this, [this, tab]() {
         if (tab == currentTab())
-            m_statusPos->setText(QString("%1:%2").arg(c.line + 1).arg(c.column + 1));
+            showCursorPosition(tab);
     });
     connect(tab, &EditorTab::statusChanged, this, [this, tab]() {
         if (tab == currentTab())
@@ -613,17 +566,25 @@ void MainWindow::updateWindowTitle()
     setWindowTitle(QString("%1%2 — QCEditor").arg(name, tab->isModified() ? "*" : ""));
 }
 
+// Line and column, the column in characters (code points) as Go to takes it.
+void MainWindow::showCursorPosition(EditorTab* tab)
+{
+    const qce::TextCursor c = tab->editor()->area()->cursorPosition();
+    const int column = qce::codepoints::codePointColumn(tab->document()->lineAt(c.line), c.column);
+    m_statusPos->setText(QString("%1:%2").arg(c.line + 1).arg(column + 1));
+    m_statusCodePoint->setText(tab->codePointAtCursor());
+}
+
 void MainWindow::updateStatusBar(EditorTab* tab)
 {
-    const QList<QLabel*> labels = {m_statusPos, m_statusLineBreaks, m_statusEncoding,
+    const QList<QLabel*> labels = {m_statusPos, m_statusCodePoint, m_statusLineBreaks, m_statusEncoding,
                                    m_statusLanguage, m_statusTab};
     if (!tab) {
         for (QLabel* label : labels) label->clear();
         return;
     }
     const auto* area = tab->editor()->area();
-    const qce::TextCursor c = area->cursorPosition();
-    m_statusPos->setText(QString("%1:%2").arg(c.line + 1).arg(c.column + 1));
+    showCursorPosition(tab);
     const auto format = tab->fileFormat();
     m_statusLineBreaks->setText(lineBreaksText(format));
     // A mixed file is saved with its most frequent kind of line break.

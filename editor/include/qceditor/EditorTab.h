@@ -28,14 +28,42 @@ class EditorTab : public QWidget
     Q_OBJECT
 public:
     explicit EditorTab(QWidget* parent = nullptr);
+    ~EditorTab() override;
 
     void revealRange(qce::TextCursor start, qce::TextCursor end);
     void showSearch();
     void showReplace();
     void findNext(bool backwards = false);
+    /// Asks for line[:column] (columns in characters, as the status bar shows
+    /// them) and moves the cursor there; recent positions are offered.
+    void goToPosition();
 
+    /// Inserts text at the cursor, replacing the selection, as one undo step;
+    /// nothing in a read-only tab.
+    void insertText(const QString& text);
+    /// The date ("Sunday 2026-10-18"), the time ("16:21:05") or both at the cursor.
+    void insertDate();
+    void insertTime();
+    void insertDateTime();
+
+    /// A read-only tab shows the file (e.g. a viewer of small files).
+    void setReadOnly(bool readOnly);
+    bool isReadOnly() const;
+    /// Long lines wrap at the window's width; on by default.
+    void setWordWrap(bool wrap);
+    bool wordWrap() const { return m_wordWrap; }
+    /// Spaces, tabs and line ends drawn as marks.
+    void setShowWhitespace(bool show);
+    bool showWhitespace() const;
+    /// The character after the cursor as "U+0105", for the status bar; empty
+    /// at the end of a line.
+    QString codePointAtCursor() const;
+
+    /// Opens a file; the undo history starts anew.
     bool loadFile(const QString& path);
     bool hasExternalChanges() const;
+    /// Reads the file again: only the lines that changed on disk are changed,
+    /// as one undo step, so Ctrl+Z brings back the text before the reload.
     bool reloadFromDisk();
     bool save();
     bool saveAs(const QString& path);
@@ -78,7 +106,9 @@ public:
     void setSpellLanguages(const QStringList& dictionaries);
 
     QString filePath() const { return m_filePath; }
-    bool    isModified() const { return m_modified; }
+    /// Differs from the file: edited (undoing back to the saved text is not a
+    /// change) or with another encoding to save in.
+    bool    isModified() const;
 
     /// Pick the highlighter again for the current file (e.g. after the Kate
     /// syntax data has been downloaded or updated).
@@ -95,8 +125,11 @@ signals:
     void statusChanged();
 
 private:
-    /// Empty `encoding` detects it.
-    bool readFile(const QString& path, bool resetSyntax, const QString& encoding = {});
+    /// Empty `encoding` detects it. A reload (`asEdit`) keeps the undo
+    /// history: the new text is one undo step.
+    bool readFile(const QString& path, bool resetSyntax, const QString& encoding = {}, bool asEdit = false);
+    /// Emits modificationChanged() when isModified() has changed.
+    void updateModified();
     void addEncodingMenu(QMenu& menu);
     /// Reopens as `encoding`, asking first when there are unsaved edits.
     void reopenAsking(const QString& encoding);
@@ -145,7 +178,11 @@ private:
     QDateTime m_diskModified;
     qint64 m_diskSize = -1;
     QString m_filePath;
-    bool    m_modified = false;
+    /// The encoding to save in was changed (not an undo step).
+    bool    m_formatChanged = false;
+    /// isModified() as last reported by modificationChanged().
+    bool    m_reportedModified = false;
+    bool    m_wordWrap = true;
 };
 
 } // namespace qceditor

@@ -4,9 +4,10 @@ Editor that uses qcodeedit and the shared MruTabWidget from qt-extra.
 
 ## Building
 
-Requires C++17, CMake 3.16+, Qt 6.2+, installed qcodeedit 1.14.0 packages
-(`qcodeedit`, `qcodeedit-kate`, `qcodeedit-katedata`, `qcodeedit-encoding`,
-the last one with [cpg](https://github.com/siplasplas/cpg)) and qt-extra 2.7 or
+Requires C++17, CMake 3.16+, Qt 6.2+, installed qcodeedit 1.19.0 packages
+(`qcodeedit`, `qcodeedit-kate`, `qcodeedit-katedata`, `qcodeedit-encoding`
+with [cpg](https://github.com/siplasplas/cpg), `qcodeedit-spell` and
+`qcodeedit-diff`) and qt-extra 2.7 or
 later (moving older versions' files, see below).
 Like gemini-commander, QCEditor uses `find_package(qt-extra 2.7 REQUIRED)`
 and links the installed `qt-extra` target; no widget sources are copied here.
@@ -52,6 +53,11 @@ Tabs support reordering, pinning, Ctrl+Tab MRU navigation and bulk closing.
 The unpinned tab limit is 20. Closing a modified tab asks whether to save
 that document, including when it is not the active tab. qt-extra 2.x keeps
 tab state attached to the page when tabs move and provides a built-in pin icon.
+
+The editor's context menu starts with the spelling corrections of the word
+under the mouse, then **Undo**, **Redo**, **Cut**, **Copy**, **Paste**,
+**Delete** and **Select All**. Long lines wrap at the window's width, with or
+without syntax highlighting.
 
 Right-click in the editor and choose **Syntax > section > language** to select
 a Kate syntax definition for that tab. Sections come from the syntax index.
@@ -102,7 +108,8 @@ installed. Other languages are added by installing a hunspell dictionary (e.g.
 `sudo apt install hunspell-de-de`); a missing one is named in the status bar.
 Building needs `libhunspell-dev` (qcodeedit-spell).
 
-The status bar shows `line:column`, the line breaks (**Unix (LF)**,
+The status bar shows `line:column` (the column in characters), the code of the
+character after the cursor (e.g. `U+0105`), the line breaks (**Unix (LF)**,
 **Windows (CRLF)**, **Mac (CR)** or **Mixed**), the encoding (**UTF-8**,
 **UTF-8 BOM** or the code page), the text's language, and the tab width. The
 language is detected in the background after the file is shown, so opening is
@@ -139,7 +146,8 @@ including nested folds and folds intersecting a multiline match. Other folds
 keep their current state.
 
 Ctrl+G opens the standard Qt input dialog with the current one-based
-`line:column` selected. Enter `line:column` or just `line` (column 1). The
+`line:column` selected. Enter `line:column` or just `line` (column 1); the
+column counts characters, as the status bar does (an emoji is one). The
 drop-down lists positions entered before, without spaces, most recent first;
 they are kept only while the application runs.
 OK moves the cursor and reveals any folds hiding the destination; Cancel leaves
@@ -177,6 +185,10 @@ When the main window becomes active (for example after Alt+Tab), QCEditor
 compares modification times and sizes of all files open in tabs with their
 last read/saved versions. Changed files reload automatically unless the tab
 has unsaved edits; then a confirmation asks before discarding those edits.
-Reload keeps the cursor/selection and the tab's syntax/theme choices. Positions
-are clamped to the new text when the file shrinks. Show events alone do not
-trigger this check; untitled and missing files are skipped.
+A reload changes only the lines that differ on disk, as one undo step: Ctrl+Z
+brings back the text before it, and the earlier undo history stays. The
+cursor and the selection follow the text they were in (a line added above
+moves them down), and the tab's syntax/theme choices stay. Show events alone
+do not trigger this check; untitled and missing files are skipped. A tab is
+modified when its text differs from the saved one: undoing back to the saved
+text makes it unmodified again.

@@ -124,6 +124,9 @@ FindBar::FindBar(EditorTab* tab) : QWidget(tab), m_tab(tab)
     auto* escape = new QShortcut(QKeySequence(Qt::Key_Escape), tab);
     escape->setContext(Qt::WidgetWithChildrenShortcut);
     connect(escape, &QShortcut::activated, this, &FindBar::closeSearch);
+    // Only while the bar is shown, so Escape otherwise reaches the window (e.g. to close a viewer).
+    escape->setEnabled(false);
+    m_escape = escape;
     auto* backwards = new QShortcut(QKeySequence(Qt::SHIFT | Qt::Key_Return), m_query);
     connect(backwards, &QShortcut::activated, this, [this]() { findNext(true); });
     auto* doc = tab->document();
@@ -135,6 +138,18 @@ FindBar::FindBar(EditorTab* tab) : QWidget(tab), m_tab(tab)
     hide();
 }
 FindBar::~FindBar() = default;
+
+void FindBar::showEvent(QShowEvent* event)
+{
+    m_escape->setEnabled(true);
+    QWidget::showEvent(event);
+}
+
+void FindBar::hideEvent(QHideEvent* event)
+{
+    m_escape->setEnabled(false);
+    QWidget::hideEvent(event);
+}
 
 bool FindBar::eventFilter(QObject* watched, QEvent* event)
 {

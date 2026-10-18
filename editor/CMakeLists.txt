@@ -34,6 +34,7 @@ target_link_libraries(qceditor-editor
         qcodeedit::encoding
     PRIVATE
         qcodeedit::spell
+        qcodeedit::diff
 )
 
 add_library(qceditor::editor ALIAS qceditor-editor)

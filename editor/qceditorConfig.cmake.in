@@ -2,10 +2,11 @@
 
 include(CMakeFindDependencyMacro)
 find_dependency(Qt6 6.2 COMPONENTS Widgets)
-find_dependency(qcodeedit 1.15.1)
-find_dependency(qcodeedit-kate 1.15.1)
-find_dependency(qcodeedit-encoding 1.15.1)
-find_dependency(qcodeedit-spell 1.15.1)
+find_dependency(qcodeedit 1.19.0)
+find_dependency(qcodeedit-kate 1.19.0)
+find_dependency(qcodeedit-encoding 1.19.0)
+find_dependency(qcodeedit-spell 1.19.0)
+find_dependency(qcodeedit-diff 1.19.0)
 
 include("${CMAKE_CURRENT_LIST_DIR}/qceditorTargets.cmake")
 

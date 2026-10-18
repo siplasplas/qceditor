@@ -21,6 +21,16 @@
 #include <QMessageBox>
 #include <QSaveFile>
 #include <QSignalBlocker>
+#include <QDateTime>
+#include <QDialogButtonBox>
+#include <QInputDialog>
+#include <QLineEdit>
+#include <QRegularExpression>
+#include <QTimer>
+#include <QUndoStack>
+#include <optional>
+#include <qce/CodePoints.h>
+#include <qce/diff/LineDiff.h>
 #include <algorithm>
 #include <functional>
 #include <qce/CodeEditArea.h>
@@ -51,13 +61,23 @@ EditorTab::EditorTab(QWidget* parent)
     connect(m_edit->area(), &QWidget::customContextMenuRequested,
             this, &EditorTab::showContextMenu);
 
+    // A reload changes only the lines that differ, as one undo step
+    // (qcodeedit-diff; installed here as well in case the program's own
+    // registration was not linked in).
+    qce::diff::install();
+    connect(m_edit->area()->undoStack(), &QUndoStack::cleanChanged,
+            this, &EditorTab::updateModified);
+
     // Keeps typed and pasted text storable in the file's code page.
     m_encoding = new qce::encoding::EncodingGuard(m_edit->area(), this);
     connect(m_encoding, &qce::encoding::EncodingGuard::encodingChanged,
             this, &EditorTab::statusChanged);
     // Switching to UTF-8 is a change that needs saving.
-    connect(m_encoding, &qce::encoding::EncodingGuard::encodingChanged,
-            this, &EditorTab::onDocumentChanged);
+    connect(m_encoding, &qce::encoding::EncodingGuard::encodingChanged, this, [this]() {
+        m_formatChanged = true;
+        hideEncodingNotice();
+        updateModified();
+    });
 
     // Wavy underlines under misspelled words in comments, strings and text;
     // the language follows the detected one until the user chooses.
@@ -117,6 +137,15 @@ EditorTab::EditorTab(QWidget* parent)
     applyThemePalette();
 }
 
+// The editor and its undo stack go only after this object's own part; what
+// they report while going must not reach it.
+EditorTab::~EditorTab()
+{
+    disconnect(m_edit->area()->undoStack(), nullptr, this, nullptr);
+    disconnect(m_doc, nullptr, this, nullptr);
+    disconnect(m_encoding, nullptr, this, nullptr);
+}
+
 void EditorTab::revealRange(qce::TextCursor start, qce::TextCursor end)
 {
     auto* area = m_edit->area();
@@ -160,10 +189,151 @@ void EditorTab::findNext(bool backwards)
     m_findBar->findNext(backwards);
 }
 
+void EditorTab::goToPosition()
+{
+    auto* area = m_edit->area();
+    const auto cursor = area->cursorPosition();
+    const int lineCount = qMax(1, m_doc->lineCount());
+    QInputDialog dialog(this);
+    dialog.setWindowTitle(tr("Go to Line/Column"));
+    dialog.setLabelText(tr("Line[:column] (1–%1):").arg(lineCount));
+    // Editable combo: the current position, then positions entered before in
+    // any tab (this session only, not saved).
+    static QStringList recentPositions;
+    // Columns in characters (code points), as the status bar shows them.
+    const int currentColumn = qce::codepoints::codePointColumn(m_doc->lineAt(cursor.line), cursor.column);
+    QStringList items{QString("%1:%2").arg(cursor.line + 1).arg(currentColumn + 1)};
+    for (const QString& recent : recentPositions)
+        if (!items.contains(recent)) items << recent;
+    dialog.setComboBoxItems(items);
+    dialog.setComboBoxEditable(true);
+    dialog.setTextValue(items.first());
+
+    auto position = [this, lineCount](const QString& text) -> std::optional<qce::TextCursor> {
+        static const QRegularExpression pattern(QStringLiteral("^\\s*([1-9][0-9]*)\\s*(?::\\s*([1-9][0-9]*)\\s*)?$"));
+        const auto match = pattern.match(text);
+        if (!match.hasMatch()) return std::nullopt;
+        bool lineOk = false, columnOk = true;
+        const int line = match.captured(1).toInt(&lineOk);
+        const int column = match.captured(2).isEmpty() ? 1 : match.captured(2).toInt(&columnOk);
+        if (!lineOk || !columnOk || line > lineCount)
+            return std::nullopt;
+        // The column counts characters (code points): walk to its UTF-16 index.
+        const QString lineText = m_doc->lineAt(line - 1);
+        int index = 0;
+        for (int i = 1; i < column; ++i) {
+            if (index >= lineText.size()) return std::nullopt;
+            index = qce::codepoints::nextIndex(lineText, index);
+        }
+        return qce::TextCursor{line - 1, index};
+    };
+    auto validate = [&dialog, position]() {
+        if (auto* buttons = dialog.findChild<QDialogButtonBox*>())
+            buttons->button(QDialogButtonBox::Ok)->setEnabled(position(dialog.textValue()).has_value());
+    };
+    connect(&dialog, &QInputDialog::textValueChanged, &dialog, validate);
+    QTimer::singleShot(0, &dialog, [&dialog, validate]() {
+        if (auto* input = dialog.findChild<QLineEdit*>()) input->selectAll();
+        validate();
+    });
+    if (dialog.exec() != QDialog::Accepted) return;
+    if (const auto target = position(dialog.textValue())) {
+        // Remembered without spaces, most recent first.
+        QString entered = dialog.textValue();
+        entered.remove(QRegularExpression(QStringLiteral("\\s")));
+        recentPositions.removeAll(entered);
+        recentPositions.prepend(entered);
+        while (recentPositions.size() > 20) recentPositions.removeLast();
+        revealRange(*target, *target);
+        area->setCursorPosition(*target);
+        area->setFocus();
+    }
+}
+
+void EditorTab::insertText(const QString& text)
+{
+    if (!isReadOnly()) m_edit->area()->insertText(text);
+}
+
+void EditorTab::insertDate()
+{
+    const QDate date = QDate::currentDate();
+    insertText(QLocale::c().dayName(date.dayOfWeek()) + QLatin1Char(' ')
+               + date.toString(QStringLiteral("yyyy-MM-dd")));
+}
+
+void EditorTab::insertTime()
+{
+    insertText(QTime::currentTime().toString(QStringLiteral("HH:mm:ss")));
+}
+
+void EditorTab::insertDateTime()
+{
+    const QDateTime now = QDateTime::currentDateTime();
+    insertText(QLocale::c().dayName(now.date().dayOfWeek()) + QLatin1Char(' ')
+               + now.toString(QStringLiteral("yyyy-MM-dd HH:mm:ss")));
+}
+
+void EditorTab::setReadOnly(bool readOnly)
+{
+    m_edit->area()->setReadOnly(readOnly);
+}
+
+bool EditorTab::isReadOnly() const
+{
+    return m_edit->area()->readOnly();
+}
+
+void EditorTab::setWordWrap(bool wrap)
+{
+    m_wordWrap = wrap;
+    m_edit->area()->setWordWrap(wrap);
+}
+
+void EditorTab::setShowWhitespace(bool show)
+{
+    m_edit->area()->setShowWhitespace(show);
+}
+
+bool EditorTab::showWhitespace() const
+{
+    return m_edit->area()->showWhitespace();
+}
+
+QString EditorTab::codePointAtCursor() const
+{
+    const auto cursor = m_edit->area()->cursorPosition();
+    const QString line = m_doc->lineAt(cursor.line);
+    if (cursor.column < 0 || cursor.column >= line.size())
+        return {};
+    char32_t codePoint = line.at(cursor.column).unicode();
+    if (QChar::isHighSurrogate(codePoint) && cursor.column + 1 < line.size()
+        && line.at(cursor.column + 1).isLowSurrogate())
+        codePoint = QChar::surrogateToUcs4(line.at(cursor.column), line.at(cursor.column + 1));
+    return QStringLiteral("U+%1").arg(static_cast<uint>(codePoint), 4, 16, QLatin1Char('0')).toUpper();
+}
+
+bool EditorTab::isModified() const
+{
+    return m_formatChanged || !m_edit->area()->undoStack()->isClean();
+}
+
+void EditorTab::updateModified()
+{
+    const bool modified = isModified();
+    if (modified == m_reportedModified) return;
+    m_reportedModified = modified;
+    emit modificationChanged(modified);
+}
+
 void EditorTab::showContextMenu(const QPoint& position)
 {
     QMenu menu(this);
     addSpellingMenu(menu, position);
+    // Undo, Redo, Cut, Copy, Paste, Delete and Select All.
+    const std::unique_ptr<QMenu> standard(m_edit->area()->createStandardContextMenu(&menu));
+    menu.addActions(standard->actions());
+    menu.addSeparator();
     auto* syntaxMenu = menu.addMenu(tr("Syntax"));
     auto* choices = new QActionGroup(&menu);
     choices->setExclusive(true);
@@ -432,7 +602,7 @@ void EditorTab::setLegacyLanguages(const QStringList& languages)
 void EditorTab::reopenAsking(const QString& name)
 {
     if (m_filePath.isEmpty()) return;
-    if (m_modified && QMessageBox::question(this, tr("Reopen with Encoding"),
+    if (isModified() && QMessageBox::question(this, tr("Reopen with Encoding"),
             tr("Discard unsaved edits and read the file again as %1?").arg(name))
             != QMessageBox::Yes)
         return;
@@ -483,6 +653,8 @@ QString EditorTab::encoding() const
 
 bool EditorTab::reopenWithEncoding(const QString& encoding)
 {
+    // Not an undo step: undoing it would bring back text decoded in the
+    // other encoding while saving in this one.
     return !m_filePath.isEmpty() && readFile(m_filePath, false, encoding);
 }
 
@@ -493,12 +665,9 @@ void EditorTab::setSaveEncoding(const QString& encoding)
 
 void EditorTab::onDocumentChanged()
 {
-    // Editing keeps the encoding the file is shown in.
+    // Editing keeps the encoding the file is shown in. Whether the text
+    // differs from the file follows the undo history (updateModified()).
     hideEncodingNotice();
-    if (!m_modified) {
-        m_modified = true;
-        emit modificationChanged(true);
-    }
 }
 
 bool EditorTab::loadFile(const QString& path)
@@ -523,21 +692,19 @@ void EditorTab::updateDiskStamp()
 bool EditorTab::reloadFromDisk()
 {
     if (m_filePath.isEmpty()) return false;
+    // Keep the encoding the file was opened in; detect again if it no longer
+    // fits. The cursor and the selection follow the text they were in.
+    if (!readFile(m_filePath, false, encoding(), true) && !readFile(m_filePath, false, {}, true))
+        return false;
     auto* area = m_edit->area();
     const auto cursor = area->cursorPosition();
     const auto anchor = cursor == area->selectionStart() ? area->selectionEnd() : area->selectionStart();
-    // Keep the encoding the file was opened in; detect again if it no longer fits.
-    if (!readFile(m_filePath, false, encoding()) && !readFile(m_filePath, false)) return false;
-    // The component clamps both endpoints if lines or columns no longer exist.
-    area->setSelection(anchor, cursor);
-    const auto clampedCursor = area->cursorPosition();
-    const auto clampedAnchor = clampedCursor == area->selectionStart() ? area->selectionEnd() : area->selectionStart();
     revealRange(area->selectionStart(), area->selectionEnd());
-    area->setSelection(clampedAnchor, clampedCursor);
+    area->setSelection(anchor, cursor);
     return true;
 }
 
-bool EditorTab::readFile(const QString& path, bool resetSyntax, const QString& encoding)
+bool EditorTab::readFile(const QString& path, bool resetSyntax, const QString& encoding, bool asEdit)
 {
     QFile f(path);
     if (!f.open(QIODevice::ReadOnly))
@@ -562,7 +729,12 @@ bool EditorTab::readFile(const QString& path, bool resetSyntax, const QString& e
         hideEncodingNotice();
 
     disconnect(m_doc, nullptr, this, nullptr);
+    // With qcodeedit-diff only the lines that differ change, as one undo step.
     m_doc->setText(decoded.text);
+    if (asEdit)
+        m_edit->area()->undoStack()->setClean();
+    else
+        m_edit->area()->undoStack()->clear();
     {
         // Loading is not an edit: no "modified" from the encoding change.
         const QSignalBlocker block(m_encoding);
@@ -578,7 +750,7 @@ bool EditorTab::readFile(const QString& path, bool resetSyntax, const QString& e
         emit statusChanged();
     });
     emit statusChanged();
-    m_modified = false;
+    m_formatChanged = false;
     m_filePath = path;
     m_diskModified = modified;
     m_diskSize = size;
@@ -595,6 +767,7 @@ bool EditorTab::readFile(const QString& path, bool resetSyntax, const QString& e
         m_syntaxFile.clear();
     }
     reapplyHighlighter();
+    m_reportedModified = false;
     emit modificationChanged(false);
     return true;
 }
@@ -624,8 +797,9 @@ bool EditorTab::saveAs(const QString& path)
     const bool renamed = path != m_filePath;
     m_filePath = path;
     updateDiskStamp();
-    m_modified = false;
-    emit modificationChanged(false);
+    m_formatChanged = false;
+    m_edit->area()->undoStack()->setClean();
+    updateModified();
     if (m_encoding->format().mixedLineBreaks) {
         // Saved with one kind of line break for every line.
         auto format = m_encoding->format();
@@ -841,6 +1015,8 @@ void EditorTab::applyCppHighlighter()
 
     hl->setInitialContextId(normal);
 
+    // Detach the old provider before its highlighter goes away.
+    m_edit->area()->setFoldingProvider(nullptr);
     m_highlighter = std::move(hl);
     m_edit->area()->setHighlighter(m_highlighter.get());
 
@@ -848,7 +1024,7 @@ void EditorTab::applyCppHighlighter()
     m_foldProvider->setPlaceholderFor("curly",   "{…}");
     m_foldProvider->setPlaceholderFor("Comment", "/*…*/");
     m_edit->area()->setFoldingProvider(m_foldProvider.get());
-    m_edit->area()->setWordWrap(true); // fold gutter requires wrap mode to render arrows
+    m_edit->area()->setWordWrap(m_wordWrap);
 }
 
 bool EditorTab::applyKateHighlighter(const QString& xmlPath)
@@ -857,6 +1033,8 @@ bool EditorTab::applyKateHighlighter(const QString& xmlPath)
     auto hl = KateXmlReader::load(xmlPath, m_theme, SyntaxData::index());
     if (!hl) return false;
 
+    // Detach the old provider before its highlighter goes away.
+    m_edit->area()->setFoldingProvider(nullptr);
     m_highlighter = std::move(hl);
     m_edit->area()->setHighlighter(m_highlighter.get());
 
@@ -869,7 +1047,7 @@ bool EditorTab::applyKateHighlighter(const QString& xmlPath)
     m_foldProvider->setPlaceholderFor("Comment", "/*…*/");
     m_foldProvider->setPlaceholderFor("Region1", "//BEGIN…END");
     m_edit->area()->setFoldingProvider(m_foldProvider.get());
-    m_edit->area()->setWordWrap(true); // fold gutter requires wrap mode to render arrows
+    m_edit->area()->setWordWrap(m_wordWrap);
     return true;
 }
 
@@ -877,7 +1055,7 @@ void EditorTab::clearHighlighter()
 {
     m_edit->area()->setHighlighter(nullptr);
     m_edit->area()->setFoldingProvider(nullptr);
-    m_edit->area()->setWordWrap(false);
+    m_edit->area()->setWordWrap(m_wordWrap);
     m_highlighter.reset();
     m_foldProvider.reset();
 }

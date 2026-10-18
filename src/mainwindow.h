@@ -43,6 +43,7 @@ private:
     EditorTab* createTab(const QString& title = QString());
     void       updateWindowTitle();
     void       updateStatusBar(EditorTab* tab);
+    void       showCursorPosition(EditorTab* tab);
     bool       confirmClose(EditorTab* tab);
     bool       saveTabAs(EditorTab* tab);
     void       offerSyntaxDownload();
@@ -61,11 +62,10 @@ private:
 
     MruTabWidget* m_tabs      = nullptr;
     QLabel*       m_statusPos = nullptr;        ///< line:column
+    QLabel*       m_statusCodePoint = nullptr;  ///< U+XXXX of the character after the caret
     QLabel*       m_statusLineBreaks = nullptr; ///< Unix (LF), Windows (CRLF), Mac (CR), Mixed
     QLabel*       m_statusEncoding = nullptr;   ///< UTF-8 or the code page
     QLabel*       m_statusLanguage = nullptr;   ///< detected in the background
     QLabel*       m_statusTab = nullptr;        ///< tab width in spaces
-    /// Positions recently entered in Go to (most recent first); this session only.
-    QStringList   m_recentPositions;
     qce::kate::KateDataDownloader* m_downloader = nullptr;
 };

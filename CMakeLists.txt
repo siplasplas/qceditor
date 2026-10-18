@@ -15,11 +15,14 @@ find_package(qt-extra 2.7 REQUIRED)
 # 1.13: Kate data in ~/.local/share/kate-data, qce::kate::migrateDataRoot()
 # 1.14: encoding detection with confidence, alternatives and preview
 # 1.15.1: spell checking (qcodeedit-spell, hunspell), CodeEditArea::cursorAt()
-find_package(qcodeedit 1.15.1 REQUIRED)
-find_package(qcodeedit-kate 1.15.1 REQUIRED)
-find_package(qcodeedit-katedata 1.15.1 REQUIRED)
-find_package(qcodeedit-encoding 1.15.1 REQUIRED)
-find_package(qcodeedit-spell 1.15.1 REQUIRED)
+# 1.17: insertText(), createStandardContextMenu()
+# 1.19: qcodeedit-diff, a reload changes only the differing lines as an undo step
+find_package(qcodeedit 1.19.0 REQUIRED)
+find_package(qcodeedit-kate 1.19.0 REQUIRED)
+find_package(qcodeedit-katedata 1.19.0 REQUIRED)
+find_package(qcodeedit-encoding 1.19.0 REQUIRED)
+find_package(qcodeedit-spell 1.19.0 REQUIRED)
+find_package(qcodeedit-diff 1.19.0 REQUIRED)
 
 # The editor itself, shared with other programs (e.g. gemini-commander).
 add_subdirectory(editor)
