@@ -19,6 +19,9 @@ cmake_install.cmake
 compile_commands.json
 *.cbp
 
+# Working notes between sessions
+HANDOFF*.md
+
 # OS junk
 .DS_Store
 Thumbs.db
