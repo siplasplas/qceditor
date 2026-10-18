@@ -77,10 +77,9 @@ SpellingReviewDialog::SpellingReviewDialog(const QList<SpellingReviewItem>& item
         row->setData(WordColumn, Qt::UserRole, i);
         if (item.choices.isEmpty()) {
             row->setText(CorrectionColumn, tr("No suggestions"));
-            row->setFlags(row->flags() & ~Qt::ItemIsEnabled);
+            row->setFlags(row->flags() & ~(Qt::ItemIsEnabled | Qt::ItemIsUserCheckable));
             continue;
         }
-        row->setFlags(row->flags() | Qt::ItemIsUserCheckable);
         row->setCheckState(WordColumn, Qt::Unchecked);
         auto* choice = new QComboBox(m_list);
         for (const auto& correction : item.choices) choice->addItem(correction.label);
