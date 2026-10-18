@@ -129,6 +129,11 @@ public:
     /// Typing), saved in the settings; off by default.
     static bool correctWhileTyping();
     static void setCorrectWhileTyping(bool correct);
+    /// The spelling dictionary of a new text, and of one too short to tell
+    /// its language (Tools > Default Spelling Language), e.g. "pl_PL";
+    /// empty: the desktop's language. Saved in the settings.
+    static QString defaultSpellLanguage();
+    static void setDefaultSpellLanguage(const QString& dictionary);
     /// Applies the settings to this tab.
     void updateSpellChecking();
     /// The corrections of the misspelled word at the cursor in a menu below

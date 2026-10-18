@@ -165,7 +165,9 @@ a misspelled word with a sure correction as soon as a space or punctuation is
 typed after it ("bhyc " becomes "być "); the status bar says so, and Ctrl+Z
 brings back the word as typed. Pasted text and words right in another installed
 language are left alone.
-The language is the detected one; **Spelling Language** in the context menu
+The language is the detected one; a new text, or one too short to tell, has
+the one chosen in **Tools > Default Spelling Language** (the desktop's unless
+chosen). **Spelling Language** in the context menu
 chooses another for the document, from the recently used ones, up to two at
 once (e.g. English + Polish), or **More…** for every dictionary hunspell has
 installed. Other languages are added by installing a hunspell dictionary (e.g.

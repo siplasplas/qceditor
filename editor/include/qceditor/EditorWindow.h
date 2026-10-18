@@ -103,6 +103,7 @@ private:
     bool askToReloadModified() const;
     void openFileDialog();
     void chooseLegacyLanguages();
+    void chooseDefaultSpellLanguage();
     void showAbout();
 
     QStringList recentFiles() const;

@@ -607,6 +607,7 @@ static const char* kSpellingEnabledKey = "spelling/enabled";
 static const char* kRecentSpellingKey = "spelling/recentDictionaries";
 static const char* kCorrectWhileTypingKey = "spelling/correctWhileTyping";
 static const char* kReviewCheckedAtFirstKey = "spelling/reviewCheckedAtFirst";
+static const char* kDefaultLanguageKey = "spelling/defaultLanguage";
 static constexpr int kRecentSpellingCount = 6;
 
 bool EditorTab::spellCheckingEnabled()
@@ -629,11 +630,22 @@ void EditorTab::setCorrectWhileTyping(bool correct)
     settings().setValue(kCorrectWhileTypingKey, correct);
 }
 
+QString EditorTab::defaultSpellLanguage()
+{
+    return settings().value(kDefaultLanguageKey).toString();
+}
+
+void EditorTab::setDefaultSpellLanguage(const QString& dictionary)
+{
+    if (dictionary.isEmpty()) settings().remove(kDefaultLanguageKey);
+    else settings().setValue(kDefaultLanguageKey, dictionary);
+}
+
 void EditorTab::updateSpellChecking()
 {
     m_spelling->setEnabled(spellCheckingEnabled());
     m_spelling->setCorrectWhileTyping(correctWhileTyping());
-    emit spellingDictionariesChanged();
+    applySpellLanguages();
 }
 
 QStringList EditorTab::spellingDictionaries() const
@@ -656,10 +668,12 @@ void EditorTab::setSpellLanguages(const QStringList& dictionaries)
 
 void EditorTab::applySpellLanguages()
 {
-    // Chosen, else the detected language, else the desktop's (e.g. a new file).
+    // Chosen, else the detected language, else the default one (a new file,
+    // or too little text to tell), else the desktop's.
     QStringList languages = m_spellLanguages;
-    if (languages.isEmpty())
-        languages << (m_language.code.isEmpty() ? QLocale::system().name().section('_', 0, 0) : m_language.code);
+    if (languages.isEmpty() && !m_language.code.isEmpty()) languages << m_language.code;
+    if (languages.isEmpty() && !defaultSpellLanguage().isEmpty()) languages << defaultSpellLanguage();
+    if (languages.isEmpty()) languages << QLocale::system().name().section('_', 0, 0);
     m_spelling->setLanguages(languages);
     emit spellingDictionariesChanged();
     if (m_spelling->isReady() || !m_spelling->isEnabled()) return;

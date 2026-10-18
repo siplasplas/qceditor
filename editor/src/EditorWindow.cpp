@@ -14,8 +14,10 @@
 #include <QDir>
 #include <QFileInfo>
 #include <QHash>
+#include <QInputDialog>
 #include <QLabel>
 #include <QListWidget>
+#include <QLocale>
 #include <QMenuBar>
 #include <QMessageBox>
 #include <QPushButton>
@@ -249,6 +251,7 @@ void EditorWindow::createMenus()
         EditorTab::setCorrectWhileTyping(on);
         forEachTab([](EditorTab* tab) { tab->updateSpellChecking(); });
     });
+    m_toolsMenu->addAction(tr("Default Spelling &Language..."), this, &EditorWindow::chooseDefaultSpellLanguage);
     // The selection's misspelled words, or the whole text's, to confirm their corrections.
     addAction(m_toolsMenu, tr("&Review Spelling..."), QKeySequence(Qt::Key_F7), [this]() {
         if (auto* tab = currentTab()) tab->reviewSpelling();
@@ -801,6 +804,28 @@ void EditorWindow::downloadNextWordFrequencies()
     const QString dictionary = m_frequencyQueue.takeFirst();
     statusBar()->showMessage(tr("Downloading word frequencies for %1…").arg(dictionaryDisplayName(dictionary)));
     frequencyDownloader()->start(dictionary);
+}
+
+// The language of a new text (and of one too short to tell): the desktop's,
+// or one of the installed dictionaries.
+void EditorWindow::chooseDefaultSpellLanguage()
+{
+    const auto dictionaries = qce::spell::installedDictionaries();
+    QStringList names{tr("The desktop's language (%1)").arg(QLocale::languageToString(QLocale::system().language()))};
+    int current = 0;
+    for (const auto& dictionary : dictionaries) {
+        names << QStringLiteral("%1 (%2)").arg(dictionary.displayName, dictionary.name);
+        if (dictionary.name == EditorTab::defaultSpellLanguage()) current = int(names.size()) - 1;
+    }
+    bool chosen = false;
+    const QString name = QInputDialog::getItem(this, tr("Default Spelling Language"),
+                                               tr("Spelling language of a new text, and of one too short to tell "
+                                                  "its language:"),
+                                               names, current, false, &chosen);
+    if (!chosen) return;
+    const int index = int(names.indexOf(name));
+    EditorTab::setDefaultSpellLanguage(index > 0 ? dictionaries[index - 1].name : QString());
+    forEachTab([](EditorTab* tab) { tab->updateSpellChecking(); });
 }
 
 // Only the code pages of the chosen languages are considered for files not in
