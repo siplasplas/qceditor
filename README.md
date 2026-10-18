@@ -6,8 +6,9 @@ Editor that uses qcodeedit and the shared MruTabWidget from qt-extra.
 
 Requires C++17, CMake 3.16+, Qt 6.2+, installed qcodeedit 1.12.0 packages
 (`qcodeedit`, `qcodeedit-kate`, `qcodeedit-katedata`, `qcodeedit-encoding`,
-the last one with [cpg](https://github.com/siplasplas/cpg)) and qt-extra 2.x.
-Like gemini-commander, QCEditor uses `find_package(qt-extra 2 REQUIRED)`
+the last one with [cpg](https://github.com/siplasplas/cpg)) and qt-extra 2.7 or
+later (moving older versions' files, see below).
+Like gemini-commander, QCEditor uses `find_package(qt-extra 2.7 REQUIRED)`
 and links the installed `qt-extra` target; no widget sources are copied here.
 
 Build and install [qt-extra](https://github.com/siplasplas/qt-extra) first
@@ -103,10 +104,21 @@ Selecting an entry reopens it (or activates its existing tab); missing files are
 shown disabled. Paths are normalized so relative paths and symlinks to the same
 file do not create duplicate entries.
 
-The list is saved atomically as `recentFiles` in a JSON `config.json` under
-`QStandardPaths::GenericDataLocation/qceditor`, normally
-`~/.local/share/qceditor/config.json` on Linux (honoring `XDG_DATA_HOME`).
-Other JSON configuration keys are preserved.
+The list is saved atomically as `recentFiles` in
+`~/.local/share/siplasplas/qceditor/recent-files.json` (the application's data
+directory, honoring `XDG_DATA_HOME`). Other JSON keys in it are preserved.
+
+### Where QCEditor keeps its files
+
+Like the other siplasplas programs, QCEditor keeps its configuration (settings,
+such as declining the syntax download) in `~/.config/siplasplas/qceditor.conf`
+and `~/.config/siplasplas/qceditor/`, and its data (the recent files) in
+`~/.local/share/siplasplas/qceditor/`. The files of older versions,
+`~/.local/share/qceditor/config.json` and `~/.config/qceditor/QCEditor.conf`, are
+moved there once at start-up (qt-extra's `qxMigrateToSiplasplas()`) and the
+emptied old directories removed; files there that QCEditor does not recognize are
+moved only when you agree. The Kate syntax data belongs to qcodeedit and stays in
+its own place.
 
 When the main window becomes active (for example after Alt+Tab), QCEditor
 compares modification times and sizes of all files open in tabs with their

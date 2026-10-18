@@ -62,8 +62,8 @@ static QString encodingText(const qce::encoding::FileFormat& format)
     return format.bom ? name + " BOM" : name;
 }
 
-MainWindow::MainWindow(QWidget* parent)
-    : QMainWindow(parent)
+MainWindow::MainWindow(const QString& recentFilesPath, QWidget* parent)
+    : QMainWindow(parent), m_recentFilesPath(recentFilesPath)
 {
     setWindowTitle("QCEditor");
     resize(1024, 768);
@@ -191,10 +191,13 @@ void MainWindow::checkExternalChanges()
 
 void MainWindow::loadRecentFiles()
 {
-    const QString root = QStandardPaths::writableLocation(QStandardPaths::GenericDataLocation);
-    if (root.isEmpty()) return;
-    m_configPath = QDir(root).filePath(QStringLiteral("qceditor/config.json"));
-    QFile file(m_configPath);
+    // Data, not configuration: ~/.local/share/siplasplas/qceditor/recent-files.json
+    if (m_recentFilesPath.isEmpty()) {
+        const QString dir = QStandardPaths::writableLocation(QStandardPaths::AppLocalDataLocation);
+        if (dir.isEmpty()) return;
+        m_recentFilesPath = QDir(dir).filePath(QStringLiteral("recent-files.json"));
+    }
+    QFile file(m_recentFilesPath);
     if (!file.exists()) return;
     if (!file.open(QIODevice::ReadOnly)) {
         statusBar()->showMessage(tr("Cannot read recent files: %1").arg(file.errorString()), 8000);
@@ -203,11 +206,11 @@ void MainWindow::loadRecentFiles()
     QJsonParseError error;
     const auto document = QJsonDocument::fromJson(file.readAll(), &error);
     if (error.error != QJsonParseError::NoError || !document.isObject()) {
-        statusBar()->showMessage(tr("Cannot read recent files: invalid JSON in %1").arg(m_configPath), 8000);
+        statusBar()->showMessage(tr("Cannot read recent files: invalid JSON in %1").arg(m_recentFilesPath), 8000);
         return;
     }
-    m_config = document.object();
-    for (const auto& entry : m_config.value(QStringLiteral("recentFiles")).toArray()) {
+    m_recentFilesJson = document.object();
+    for (const auto& entry : m_recentFilesJson.value(QStringLiteral("recentFiles")).toArray()) {
         if (!entry.isString() || entry.toString().isEmpty()) continue;
         const auto path = normalizedFilePath(entry.toString());
         if (!m_recentFiles.contains(path)) m_recentFiles.append(path);
@@ -217,15 +220,15 @@ void MainWindow::loadRecentFiles()
 
 void MainWindow::saveRecentFiles()
 {
-    if (m_configPath.isEmpty()) return;
-    m_config.insert(QStringLiteral("recentFiles"), QJsonArray::fromStringList(m_recentFiles));
-    if (!QDir().mkpath(QFileInfo(m_configPath).absolutePath())) {
-        statusBar()->showMessage(tr("Cannot create configuration directory: %1")
-                                .arg(QFileInfo(m_configPath).absolutePath()), 8000);
+    if (m_recentFilesPath.isEmpty()) return;
+    m_recentFilesJson.insert(QStringLiteral("recentFiles"), QJsonArray::fromStringList(m_recentFiles));
+    if (!QDir().mkpath(QFileInfo(m_recentFilesPath).absolutePath())) {
+        statusBar()->showMessage(tr("Cannot create data directory: %1")
+                                .arg(QFileInfo(m_recentFilesPath).absolutePath()), 8000);
         return;
     }
-    QSaveFile file(m_configPath);
-    const auto json = QJsonDocument(m_config).toJson(QJsonDocument::Indented);
+    QSaveFile file(m_recentFilesPath);
+    const auto json = QJsonDocument(m_recentFilesJson).toJson(QJsonDocument::Indented);
     if (!file.open(QIODevice::WriteOnly) || file.write(json) != json.size() || !file.commit())
         statusBar()->showMessage(tr("Cannot save recent files: %1").arg(file.errorString()), 8000);
 }

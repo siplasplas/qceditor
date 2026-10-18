@@ -8,7 +8,8 @@ set(CMAKE_AUTOUIC ON)
 set(CMAKE_AUTORCC ON)
 
 find_package(Qt6 6.2 REQUIRED COMPONENTS Core Gui Widgets)
-find_package(qt-extra 2 REQUIRED)
+# 2.7: qxMigrateToSiplasplas() moves older versions' files at start-up
+find_package(qt-extra 2.7 REQUIRED)
 find_package(qcodeedit 1.12.0 REQUIRED)
 find_package(qcodeedit-kate REQUIRED)
 find_package(qcodeedit-katedata REQUIRED)

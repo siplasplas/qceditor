@@ -13,7 +13,9 @@ class MainWindow : public QMainWindow
 {
     Q_OBJECT
 public:
-    explicit MainWindow(QWidget* parent = nullptr);
+    /// @p recentFilesPath: where the recent files are kept; empty: recent-files.json
+    /// in the application's data directory (~/.local/share/siplasplas/qceditor).
+    explicit MainWindow(const QString& recentFilesPath = QString(), QWidget* parent = nullptr);
 
     void openFile(const QString& path);
 
@@ -51,8 +53,8 @@ private:
     bool m_checkingExternalChanges = false;
     QMenu* m_recentFilesMenu = nullptr;
     QStringList m_recentFiles;
-    QString m_configPath;
-    QJsonObject m_config;
+    QString m_recentFilesPath;
+    QJsonObject m_recentFilesJson;
 
     MruTabWidget* m_tabs      = nullptr;
     QLabel*       m_statusPos = nullptr;        ///< line:column
