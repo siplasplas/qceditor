@@ -71,6 +71,20 @@ guessed from the text. The choice is saved in `~/.config/siplasplas/qceditor.con
 and applies to files opened afterwards. The language field of the status bar
 shows the detected language's probability in its tooltip.
 
+Spelling is checked as you type (**Tools > Check Spelling**, on by default and
+remembered): misspelled words get a wavy red underline, in source code only in
+comments, strings and documentation, in plain text everywhere; identifiers,
+addresses and paths are not checked. Right-clicking a misspelled word offers up
+to 8 suggestions (choosing one replaces the word, undone in one step), **Add to
+Dictionary** (a user dictionary shared with other siplasplas programs,
+`~/.local/share/siplasplas/spell/`) and **Ignore** (this document, this session).
+The language is the detected one; **Spelling Language** in the context menu
+chooses another for the document, from the recently used ones, up to two at
+once (e.g. English + Polish), or **More…** for every dictionary hunspell has
+installed. Other languages are added by installing a hunspell dictionary (e.g.
+`sudo apt install hunspell-de-de`); a missing one is named in the status bar.
+Building needs `libhunspell-dev` (qcodeedit-spell).
+
 The status bar shows `line:column`, the line breaks (**Unix (LF)**,
 **Windows (CRLF)**, **Mac (CR)** or **Mixed**), the encoding (**UTF-8**,
 **UTF-8 BOM** or the code page), the text's language, and the tab width. The

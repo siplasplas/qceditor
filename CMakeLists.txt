@@ -12,10 +12,12 @@ find_package(Qt6 6.2 REQUIRED COMPONENTS Core Gui Widgets)
 find_package(qt-extra 2.7 REQUIRED)
 # 1.13: Kate data in ~/.local/share/kate-data, qce::kate::migrateDataRoot()
 # 1.14: encoding detection with confidence, alternatives and preview
-find_package(qcodeedit 1.14.0 REQUIRED)
-find_package(qcodeedit-kate 1.14.0 REQUIRED)
-find_package(qcodeedit-katedata 1.14.0 REQUIRED)
-find_package(qcodeedit-encoding 1.14.0 REQUIRED)
+# 1.15.1: spell checking (qcodeedit-spell, hunspell), CodeEditArea::cursorAt()
+find_package(qcodeedit 1.15.1 REQUIRED)
+find_package(qcodeedit-kate 1.15.1 REQUIRED)
+find_package(qcodeedit-katedata 1.15.1 REQUIRED)
+find_package(qcodeedit-encoding 1.15.1 REQUIRED)
+find_package(qcodeedit-spell 1.15.1 REQUIRED)
 
 set(SOURCES
     src/main.cpp
@@ -23,6 +25,7 @@ set(SOURCES
     src/findbar.cpp
     src/editortab.cpp
     src/encodingchoicedialog.cpp
+    src/spelllanguagedialog.cpp
     src/syntaxdata.cpp
 )
 
@@ -32,6 +35,7 @@ set(HEADERS
     src/findbar.h
     src/editortab.h
     src/encodingchoicedialog.h
+    src/spelllanguagedialog.h
     src/syntaxdata.h
 )
 
@@ -48,4 +52,5 @@ target_link_libraries(qceditor PRIVATE
     qcodeedit::kate
     qcodeedit::katedata
     qcodeedit::encoding
+    qcodeedit::spell
 )

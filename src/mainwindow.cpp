@@ -151,6 +151,15 @@ MainWindow::MainWindow(const QString& recentFilesPath, QWidget* parent)
                          this, &MainWindow::updateSyntaxData);
     toolsMenu->addAction(tr("&Languages of Files Not in UTF-8..."),
                          this, &MainWindow::chooseLegacyLanguages);
+    toolsMenu->addSeparator();
+    auto* spelling = toolsMenu->addAction(tr("Check &Spelling"));
+    spelling->setCheckable(true);
+    spelling->setChecked(EditorTab::spellCheckingEnabled());
+    connect(spelling, &QAction::toggled, this, [this](bool enabled) {
+        EditorTab::setSpellCheckingEnabled(enabled);
+        for (int i = 0; i < m_tabs->count(); ++i)
+            if (auto* tab = qobject_cast<EditorTab*>(m_tabs->widget(i))) tab->updateSpellChecking();
+    });
 
     connect(m_tabs, &MruTabWidget::tabAboutToClose,
             this, &MainWindow::onTabAboutToClose, Qt::DirectConnection);
@@ -448,6 +457,9 @@ EditorTab* MainWindow::createTab(const QString& title)
     connect(tab, &EditorTab::statusChanged, this, [this, tab]() {
         if (tab == currentTab())
             updateStatusBar(tab);
+    });
+    connect(tab, &EditorTab::message, this, [this](const QString& text) {
+        statusBar()->showMessage(text, 10000);
     });
 
     return tab;

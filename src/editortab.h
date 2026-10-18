@@ -18,6 +18,7 @@ class QMenu;
 class QVBoxLayout;
 class FindBar;
 namespace qce::encoding { class EncodingGuard; }
+namespace qce::spell { class CodeEditSpelling; }
 
 class EditorTab : public QWidget
 {
@@ -64,6 +65,15 @@ public:
     static QStringList legacyLanguages();
     static void setLegacyLanguages(const QStringList& languages);
 
+    /// Spell checking (Tools > Check Spelling), saved in the settings; on by default.
+    static bool spellCheckingEnabled();
+    static void setSpellCheckingEnabled(bool enabled);
+    /// Applies the setting to this tab.
+    void updateSpellChecking();
+    /// Spelling dictionaries chosen for this document (e.g. en_US, pl_PL);
+    /// empty = the detected language.
+    void setSpellLanguages(const QStringList& dictionaries);
+
     QString filePath() const { return m_filePath; }
     bool    isModified() const { return m_modified; }
 
@@ -75,6 +85,8 @@ public:
     qce::SimpleTextDocument* document() { return m_doc; }
 
 signals:
+    /// A message for the status bar (e.g. a missing spelling dictionary).
+    void message(const QString& text);
     void modificationChanged(bool modified);
     /// Encoding, line breaks or language changed (status bar refresh).
     void statusChanged();
@@ -87,6 +99,9 @@ private:
     void reopenAsking(const QString& encoding);
     void showEncodingNotice();
     void hideEncodingNotice();
+    /// The dictionaries for this document: chosen, or the detected language.
+    void applySpellLanguages();
+    void addSpellingMenu(QMenu& menu, const QPoint& position);
     void updateDiskStamp();
     void onDocumentChanged();
     void showContextMenu(const QPoint& position);
@@ -116,6 +131,9 @@ private:
     QFrame* m_encodingNotice = nullptr;
     QLabel* m_encodingNoticeText = nullptr;
     qce::encoding::EncodingDetection m_uncertain;
+    qce::spell::CodeEditSpelling* m_spelling = nullptr;
+    QStringList m_spellLanguages;  ///< chosen for this document; empty = detected
+    QString m_spellMissing;        ///< language whose missing dictionary was reported
     qce::encoding::EncodingGuard* m_encoding = nullptr;
     bool m_saveCancelled = false;
     qce::encoding::Language m_language;
