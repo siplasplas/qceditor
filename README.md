@@ -156,10 +156,10 @@ word with its first correction (remembered); the
 others are checked by hand (picking another correction checks the word too).
 **Show only checked words** hides the rest, to look over what will change. The
 window says how long finding the corrections took (seconds, and milliseconds a
-word): **Tools > Hunspell Suggestions** adds hunspell's own suggestions always,
-or only when the dictionary's forms give none, about four times faster with
-the same results on a test list. **Correct** replaces the
-checked words, all of them one undo step; nothing changes without it.
+word). **Add to Dictionary** and **Ignore** take the selected word out of the
+list, every row of it (an English or coined word written on purpose).
+**Correct** replaces the checked words, all of them one undo step; nothing
+changes without it.
 **Tools > Correct Spelling While Typing** (off by default, remembered) corrects
 a misspelled word with a sure correction as soon as a space or punctuation is
 typed after it ("bhyc " becomes "być "); the status bar says so, and Ctrl+Z
