@@ -60,8 +60,21 @@ public:
     QString codePointAtCursor() const;
 
     /// Opens a file; the undo history starts anew. A path that does not exist
-    /// yet gives an empty UTF-8 document saved under it.
+    /// yet gives an empty UTF-8 document saved under it. An encrypted .een
+    /// file asks for its password (any text, taken as UTF-8); files of EdiQ
+    /// and of the older Editas are read, and saving always writes EdiQ's
+    /// format, asking a new file for a password (visible ASCII only).
     bool loadFile(const QString& path);
+    /// The last load was cancelled by the user (e.g. the password question),
+    /// not failed: no error needs showing.
+    bool loadCancelled() const { return m_loadCancelled; }
+
+    /// The file is an encrypted .een file (by its name).
+    static bool isEncryptedFile(const QString& path);
+    bool isEncrypted() const;
+    /// Asks for the current and a new password of an encrypted file; the new
+    /// one is used when the file is saved next.
+    bool changePassword();
     bool hasExternalChanges() const;
     /// Takes the file as it is on disk now as the known version, so that
     /// hasExternalChanges() reports only later changes (e.g. after the user
@@ -135,6 +148,11 @@ private:
     bool readFile(const QString& path, bool resetSyntax, const QString& encoding = {}, bool asEdit = false);
     /// Emits modificationChanged() when isModified() has changed.
     void updateModified();
+    /// Replaces the bytes of an encrypted .een file with its text, asking for
+    /// the password; false when cancelled or unreadable.
+    bool decryptIfEncrypted(const QString& path, QByteArray* bytes);
+    bool askNewPassword();
+    void forgetPassword();
     void addEncodingMenu(QMenu& menu);
     /// Reopens as `encoding`, asking first when there are unsaved edits.
     void reopenAsking(const QString& encoding);
@@ -188,6 +206,9 @@ private:
     /// isModified() as last reported by modificationChanged().
     bool    m_reportedModified = false;
     bool    m_wordWrap = true;
+    /// Password of an encrypted .een file, kept for saving and reloading.
+    QString m_eenPassword;
+    bool    m_loadCancelled = false;
 };
 
 } // namespace qceditor

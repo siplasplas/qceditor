@@ -3,9 +3,20 @@
 # and replace, Kate syntax, encodings and spelling. Each program keeps the
 # editor's settings in its own place (qceditor::Settings).
 
+# Encrypted .een files (AES, Argon2) with Botan 2 or 3 (libbotan-2-dev).
+find_package(PkgConfig REQUIRED)
+pkg_check_modules(QCEDITOR_BOTAN IMPORTED_TARGET botan-2)
+set(QCEDITOR_BOTAN_MODULE botan-2)
+if(NOT QCEDITOR_BOTAN_FOUND)
+    pkg_check_modules(QCEDITOR_BOTAN REQUIRED IMPORTED_TARGET botan-3)
+    set(QCEDITOR_BOTAN_MODULE botan-3)
+endif()
+
 add_library(qceditor-editor STATIC
     src/EditorWindow.cpp
     src/EditorTab.cpp
+    src/EenFile.cpp
+    src/EenFile.h
     src/FindBar.cpp
     src/EncodingChoiceDialog.cpp
     src/SpellLanguageDialog.cpp
@@ -40,7 +51,10 @@ target_link_libraries(qceditor-editor
         qcodeedit::katedata
         qcodeedit::spell
         qcodeedit::diff
+        PkgConfig::QCEDITOR_BOTAN
 )
+# Botan 3 needs C++20.
+target_compile_features(qceditor-editor PRIVATE cxx_std_20)
 
 add_library(qceditor::editor ALIAS qceditor-editor)
 set_target_properties(qceditor-editor PROPERTIES EXPORT_NAME editor)

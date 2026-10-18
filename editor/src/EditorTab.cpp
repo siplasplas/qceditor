@@ -31,6 +31,8 @@
 #include <optional>
 #include <qce/CodePoints.h>
 #include <qce/diff/LineDiff.h>
+#include <QGuiApplication>
+#include "EenFile.h"
 #include <algorithm>
 #include <functional>
 #include <qce/CodeEditArea.h>
@@ -144,6 +146,7 @@ EditorTab::~EditorTab()
     disconnect(m_edit->area()->undoStack(), nullptr, this, nullptr);
     disconnect(m_doc, nullptr, this, nullptr);
     disconnect(m_encoding, nullptr, this, nullptr);
+    forgetPassword();
 }
 
 void EditorTab::revealRange(qce::TextCursor start, qce::TextCursor end)
@@ -272,6 +275,115 @@ void EditorTab::insertDateTime()
     const QDateTime now = QDateTime::currentDateTime();
     insertText(QLocale::c().dayName(now.date().dayOfWeek()) + QLatin1Char(' ')
                + now.toString(QStringLiteral("yyyy-MM-dd HH:mm:ss")));
+}
+
+bool EditorTab::isEncryptedFile(const QString& path)
+{
+    return een::isEenPath(path);
+}
+
+bool EditorTab::isEncrypted() const
+{
+    return een::isEenPath(m_filePath);
+}
+
+// The text of an encrypted .een file, asking for its password (the one it
+// was opened with first, e.g. on a reload). A .een file without the header
+// (new, or saved by another program) is plain text.
+bool EditorTab::decryptIfEncrypted(const QString& path, QByteArray* bytes)
+{
+    if (!een::isEenPath(path) || een::format(*bytes) == een::Format::None)
+        return true;
+    QString password = m_eenPassword;
+    const QString name = QFileInfo(path).fileName();
+    for (;;) {
+        if (password.isEmpty()) {
+            bool ok = false;
+            password = QInputDialog::getText(this, tr("Encrypted File"), tr("Password for %1:").arg(name),
+                                             QLineEdit::Password, QString(), &ok);
+            if (!ok) {
+                m_loadCancelled = true;
+                return false;
+            }
+        }
+        QGuiApplication::setOverrideCursor(Qt::WaitCursor);
+        const een::Decrypted result = een::decrypt(*bytes, password);
+        QGuiApplication::restoreOverrideCursor();
+        if (result.status == een::Status::Ok) {
+            *bytes = result.data;
+            m_eenPassword = password;
+            return true;
+        }
+        if (result.status == een::Status::Invalid) {
+            QMessageBox::warning(this, tr("Encrypted File"), tr("%1 is damaged or of an unknown version.").arg(name));
+            m_loadCancelled = true;
+            return false;
+        }
+        QMessageBox::warning(this, tr("Encrypted File"), tr("Wrong password for %1 (check Caps Lock).").arg(name));
+        password.clear();
+    }
+}
+
+bool EditorTab::askNewPassword()
+{
+    bool ok = false;
+    const QString name = m_filePath.isEmpty() ? tr("the file") : QFileInfo(m_filePath).fileName();
+    const QString first = QInputDialog::getText(this, tr("Set Password"),
+                                                tr("New password for %1:").arg(name),
+                                                QLineEdit::Password, QString(), &ok);
+    if (!ok) return false;
+    if (first.isEmpty()) {
+        QMessageBox::warning(this, tr("Set Password"), tr("The password is empty."));
+        return false;
+    }
+    // A new password is visible ASCII only (no spaces, no line breaks), the
+    // same bytes for every program and keyboard; any password opens a file.
+    const bool visibleAscii = std::all_of(first.cbegin(), first.cend(), [](QChar c) {
+        return c.unicode() > 0x20 && c.unicode() < 0x7F;
+    });
+    if (!visibleAscii) {
+        QMessageBox::warning(this, tr("Set Password"),
+                             tr("A new password may contain only ASCII letters, digits and punctuation, "
+                                "without spaces."));
+        return false;
+    }
+    const QString second = QInputDialog::getText(this, tr("Set Password"), tr("Repeat the password:"),
+                                                 QLineEdit::Password, QString(), &ok);
+    if (!ok) return false;
+    if (second != first) {
+        QMessageBox::warning(this, tr("Set Password"), tr("The two passwords differ."));
+        return false;
+    }
+    forgetPassword();
+    m_eenPassword = first;
+    return true;
+}
+
+bool EditorTab::changePassword()
+{
+    if (!isEncrypted()) return false;
+    if (!m_eenPassword.isEmpty()) {
+        bool ok = false;
+        const QString current = QInputDialog::getText(this, tr("Change Password"), tr("Current password:"),
+                                                      QLineEdit::Password, QString(), &ok);
+        if (!ok) return false;
+        if (current != m_eenPassword) {
+            QMessageBox::warning(this, tr("Change Password"),
+                                 tr("Wrong password. If you have forgotten it, copy the text into a new file."));
+            return false;
+        }
+    }
+    if (!askNewPassword()) return false;
+    // Takes effect when the file is saved.
+    m_formatChanged = true;
+    updateModified();
+    return true;
+}
+
+void EditorTab::forgetPassword()
+{
+    m_eenPassword.fill(QChar(0));
+    m_eenPassword.clear();
 }
 
 void EditorTab::setReadOnly(bool readOnly)
@@ -632,7 +744,8 @@ void EditorTab::chooseEncoding()
 {
     QFile file(m_filePath);
     if (m_filePath.isEmpty() || !file.open(QIODevice::ReadOnly)) return;
-    const QByteArray bytes = file.readAll();
+    QByteArray bytes = file.readAll();
+    if (!decryptIfEncrypted(m_filePath, &bytes)) return;
     // The options as detected on opening; detect again if the file has none.
     QList<qce::encoding::EncodingOption> options = m_uncertain.options;
     if (options.isEmpty()) options = qce::encoding::detectEncoding(bytes).options;
@@ -675,7 +788,8 @@ bool EditorTab::loadFile(const QString& path)
     if (QFileInfo::exists(path))
         return readFile(path, true);
     // A name that does not exist yet (e.g. a new file named in a file manager):
-    // an empty UTF-8 document, saved there.
+    // an empty UTF-8 document, saved there (a .een file asks for a password then).
+    forgetPassword();
     m_doc->setText(QString());
     m_edit->area()->undoStack()->clear();
     {
@@ -737,8 +851,10 @@ bool EditorTab::readFile(const QString& path, bool resetSyntax, const QString& e
     const QFileInfo stamp(f);
     const auto modified = stamp.lastModified();
     const auto size = stamp.size();
-    const QByteArray bytes = f.readAll();
+    QByteArray bytes = f.readAll();
     if (f.error() != QFileDevice::NoError) return false;
+    m_loadCancelled = false;
+    if (!decryptIfEncrypted(path, &bytes)) return false;
     // Code page or UTF, detected unless given; saved back the same way.
     const auto decoded = qce::encoding::decode(bytes, encoding, legacyLanguages());
     if (!decoded.ok) return false;
@@ -812,6 +928,26 @@ bool EditorTab::saveAs(const QString& path)
     if (!m_encoding->encodeForSave(m_doc->toPlainText(), &bytes)) {
         m_saveCancelled = true;
         return false;
+    }
+    if (een::isEenPath(path)) {
+        // Encrypted, always in the newer (EdiQ) format; a new file asks for a password.
+        if (m_eenPassword.isEmpty() && !askNewPassword()) {
+            m_saveCancelled = true;
+            return false;
+        }
+        QGuiApplication::setOverrideCursor(Qt::WaitCursor);
+        bytes = een::encrypt(bytes, m_eenPassword);
+        QGuiApplication::restoreOverrideCursor();
+    } else if (!m_eenPassword.isEmpty()) {
+        // The decrypted text would be readable by anyone.
+        if (QMessageBox::question(this, tr("Save Without Encryption"),
+                                  tr("%1 is not an encrypted .een file: the text will be saved unencrypted. "
+                                     "Continue?").arg(QFileInfo(path).fileName()))
+            != QMessageBox::Yes) {
+            m_saveCancelled = true;
+            return false;
+        }
+        forgetPassword();
     }
     QSaveFile f(path);
     f.setDirectWriteFallback(true);

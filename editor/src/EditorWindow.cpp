@@ -157,6 +157,13 @@ void EditorWindow::createMenus()
     m_fileMenu->addSeparator();
     addAction(m_fileMenu, tr("&Save"), QKeySequence::Save, [this]() { saveTab(currentTab()); });
     addAction(m_fileMenu, tr("Save &As..."), QKeySequence::SaveAs, [this]() { saveTabAs(currentTab()); });
+    // For encrypted .een files; the new password is used when the file is saved.
+    auto* changePassword = m_fileMenu->addAction(tr("Change &Password..."), this, [this]() {
+        if (auto* tab = currentTab()) tab->changePassword();
+    });
+    connect(m_fileMenu, &QMenu::aboutToShow, this, [this, changePassword]() {
+        changePassword->setEnabled(currentTab() && currentTab()->isEncrypted());
+    });
     m_fileMenu->addSeparator();
     addAction(m_fileMenu, tr("&Close Tab"), QKeySequence(Qt::CTRL | Qt::Key_W), [this]() {
         if (m_tabs->count() > 0) m_tabs->requestCloseTab(m_tabs->currentIndex());
@@ -340,8 +347,10 @@ void EditorWindow::openFile(const QString& requestedPath)
     if (!m_tabs->makeRoomForNewTab()) return;
     auto* tab = new EditorTab();
     if (!tab->loadFile(path)) {
+        // Cancelled (e.g. the password question) needs no error.
+        if (!tab->loadCancelled())
+            QMessageBox::critical(this, tr("Error"), tr("Cannot open file:\n%1").arg(path));
         delete tab;
-        QMessageBox::critical(this, tr("Error"), tr("Cannot open file:\n%1").arg(path));
         return;
     }
     addTab(tab, path);

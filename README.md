@@ -7,8 +7,8 @@ Editor that uses qcodeedit and the shared MruTabWidget from qt-extra.
 Requires C++17, CMake 3.16+, Qt 6.2+, installed qcodeedit 1.19.0 packages
 (`qcodeedit`, `qcodeedit-kate`, `qcodeedit-katedata`, `qcodeedit-encoding`
 with [cpg](https://github.com/siplasplas/cpg), `qcodeedit-spell` and
-`qcodeedit-diff`) and qt-extra 2.7 or
-later (moving older versions' files, see below).
+`qcodeedit-diff`), qt-extra 2.7 or later (moving older versions' files, see
+below) and Botan 2 or 3 (`libbotan-2-dev`, for encrypted files).
 Like gemini-commander, QCEditor uses `find_package(qt-extra 2.7 REQUIRED)`
 and links the installed `qt-extra` target; no widget sources are copied here.
 
@@ -188,6 +188,22 @@ file do not create duplicate entries.
 The list is saved atomically as `recentFiles` in
 `~/.local/share/siplasplas/qceditor/recent-files.json` (the application's data
 directory, honoring `XDG_DATA_HOME`). Other JSON keys in it are preserved.
+
+### Encrypted files (.een)
+
+A file with the `.een` extension is encrypted on disk. Opening it asks for
+its password (any text; a wrong one asks again); the text is decrypted only
+in memory. QCEditor reads the files of the earlier editors EdiQ (AES-256 with
+an Argon2id key) and Editas (AES-128 with an MD5 key, an older and weaker
+format), and always saves in EdiQ's format, so an Editas file is converted
+the first time it is saved; EdiQ still opens what QCEditor saves. Saving a new
+`.een` file asks for a password twice; a new password may contain only
+visible ASCII characters (letters, digits, punctuation, no spaces), so that
+every program and keyboard gives the same bytes. **File > Change Password…**
+sets a new password, used when the file is saved next. Saving the text under
+a name without `.een` asks first, as it would be written unencrypted. A
+`.een` file without the encryption header (e.g. new) is read as plain text
+and encrypted when saved.
 
 ### Where QCEditor keeps its files
 
