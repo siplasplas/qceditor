@@ -154,7 +154,8 @@ corrections only (a single suggestion close to the word, e.g. "bhyc" → być, n
 "agents" → agent), the words with a single suggestion, close or not, or every
 word with its first correction (remembered); the
 others are checked by hand with their check boxes (picking a correction checks
-the word only with **Picking a correction checks the word** on).
+the word, also the one shown, only with **Picking a correction checks the
+word** on).
 **Show** lists all words, only the checked ones (to look over what will change)
 or only the unchecked ones (left to decide); Ctrl+C or the context menu copies
 the selected rows (word, correction, score, line and the whole line of text,
