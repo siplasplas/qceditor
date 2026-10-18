@@ -127,7 +127,7 @@ public:
     /// Applies the setting to this tab.
     void updateSpellChecking();
     /// The corrections of the misspelled word at the cursor in a menu below
-    /// it, to choose with the keyboard (Ctrl+Enter).
+    /// it, to choose with the keyboard (Alt+Enter).
     void showSpellingCorrections();
     /// Spelling dictionaries chosen for this document (e.g. en_US, pl_PL);
     /// empty = the detected language.

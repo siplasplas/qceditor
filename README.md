@@ -133,8 +133,9 @@ addresses and paths are not checked. Right-clicking a misspelled word offers up
 to 8 suggestions (choosing one replaces the word, undone in one step), **Add to
 Dictionary** (a user dictionary shared with other siplasplas programs,
 `~/.local/share/siplasplas/spell/`) and **Ignore** (this document, this session).
-Ctrl+Enter opens the same choices for the misspelled word at the cursor, below
-it, to pick with the keyboard.
+Alt+Enter opens the same choices for the misspelled word at the cursor, below
+it, to pick with the keyboard. Usually there is one suggestion, three at most:
+only those nearly as good as the best are offered (qcodeedit 1.20).
 The language is the detected one; **Spelling Language** in the context menu
 chooses another for the document, from the recently used ones, up to two at
 once (e.g. English + Polish), or **More…** for every dictionary hunspell has

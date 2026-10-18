@@ -24,13 +24,14 @@ endif()
 # 1.15.1: spell checking (qcodeedit-spell, hunspell), CodeEditArea::cursorAt()
 # 1.17: insertText(), createStandardContextMenu()
 # 1.19: qcodeedit-diff, a reload changes only the differing lines as an undo step
+# 1.20.1: spelling suggestions over all forms of the dictionary, usually one
 foreach(package qcodeedit qcodeedit-kate qcodeedit-katedata qcodeedit-encoding qcodeedit-spell qcodeedit-diff)
     string(REPLACE "qcodeedit-" "" component ${package})
     if(package STREQUAL "qcodeedit")
         set(component qcodeedit)
     endif()
     if(NOT TARGET qcodeedit::${component})
-        find_package(${package} 1.19.0 REQUIRED)
+        find_package(${package} 1.20.1 REQUIRED)
     endif()
 endforeach()
 

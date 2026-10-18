@@ -87,9 +87,9 @@ EditorTab::EditorTab(QWidget* parent)
     m_spelling = new qce::spell::CodeEditSpelling(m_edit->area(), this);
     m_spelling->setEnabled(spellCheckingEnabled());
     applySpellLanguages();
-    // Ctrl+Enter: the corrections of the word at the cursor, without the mouse.
+    // Alt+Enter: the corrections of the word at the cursor, without the mouse.
     for (const auto key : {Qt::Key_Return, Qt::Key_Enter}) {
-        auto* corrections = new QShortcut(QKeySequence(Qt::CTRL | key), m_edit->area());
+        auto* corrections = new QShortcut(QKeySequence(Qt::ALT | key), m_edit->area());
         corrections->setContext(Qt::WidgetShortcut);
         connect(corrections, &QShortcut::activated, this, &EditorTab::showSpellingCorrections);
     }
@@ -667,7 +667,7 @@ bool EditorTab::addSpellingCorrections(QMenu& menu, qce::TextCursor position)
     return true;
 }
 
-// Ctrl+Enter: the corrections of the misspelled word at the cursor, below
+// Alt+Enter: the corrections of the misspelled word at the cursor, below
 // it, to choose with the keyboard.
 void EditorTab::showSpellingCorrections()
 {
