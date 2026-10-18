@@ -613,6 +613,12 @@ void EditorTab::setSpellCheckingEnabled(bool enabled)
 void EditorTab::updateSpellChecking()
 {
     m_spelling->setEnabled(spellCheckingEnabled());
+    emit spellingDictionariesChanged();
+}
+
+QStringList EditorTab::spellingDictionaries() const
+{
+    return m_spelling->isEnabled() ? m_spelling->dictionaries() : QStringList();
 }
 
 void EditorTab::setSpellLanguages(const QStringList& dictionaries)
@@ -635,6 +641,7 @@ void EditorTab::applySpellLanguages()
     if (languages.isEmpty())
         languages << (m_language.code.isEmpty() ? QLocale::system().name().section('_', 0, 0) : m_language.code);
     m_spelling->setLanguages(languages);
+    emit spellingDictionariesChanged();
     if (m_spelling->isReady() || !m_spelling->isEnabled()) return;
     // Said once per language: which dictionary package would add it.
     const QString missing = languages.join(',');

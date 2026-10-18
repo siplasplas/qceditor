@@ -29,10 +29,22 @@
 #include <qce/kate/KateDataDownloader.h>
 #include <qce/kate/KatePaths.h>
 #include <qce/kate/KateSyntaxVersion.h>
+#include <qce/spell/SpellChecker.h>
+#include <qce/spell/WordFrequencyDownloader.h>
 
 namespace qceditor {
 
 namespace {
+
+// Absent: not asked yet; true: download the lists when needed; false: never.
+const char* kWordFrequenciesKey = "spelling/downloadWordFrequencies";
+
+QString dictionaryDisplayName(const QString& dictionary)
+{
+    for (const auto& installed : qce::spell::installedDictionaries())
+        if (installed.name == dictionary) return installed.displayName;
+    return dictionary;
+}
 
 constexpr int kRecentFilesLimit = 20;
 const char* kRecentFilesKey = "recentFiles";
@@ -228,6 +240,22 @@ void EditorWindow::createMenus()
         EditorTab::setSpellCheckingEnabled(enabled);
         forEachTab([](EditorTab* tab) { tab->updateSpellChecking(); });
     });
+    // Common words before rare ones in the suggestions; the list of a
+    // language is fetched when a dictionary of it is first used.
+    m_wordFrequencies = m_toolsMenu->addAction(tr("Download &Word Frequencies for Spelling"));
+    m_wordFrequencies->setCheckable(true);
+    m_wordFrequencies->setChecked(settings().value(kWordFrequenciesKey, false).toBool());
+    m_wordFrequencies->setToolTip(tr("Spelling suggestions put common words first; the list of the most "
+                                     "frequent words of a language is downloaded when it is first needed"));
+    connect(m_wordFrequencies, &QAction::toggled, this, [this](bool download) {
+        settings().setValue(kWordFrequenciesKey, download);
+        if (!download) return;
+        m_frequencyTried.clear();
+        QStringList dictionaries;
+        forEachTab([&dictionaries](EditorTab* tab) { dictionaries << tab->spellingDictionaries(); });
+        dictionaries.removeDuplicates();
+        offerWordFrequencies(dictionaries);
+    });
     auto* askReload = m_toolsMenu->addAction(tr("&Ask to Reload Modified Files"));
     askReload->setCheckable(true);
     askReload->setChecked(askToReloadModified());
@@ -286,6 +314,13 @@ EditorTab* EditorWindow::addTab(EditorTab* tab, const QString& path)
     });
     connect(tab, &EditorTab::message, this, [this](const QString& text) {
         statusBar()->showMessage(text, 10000);
+    });
+    // Queued: the question may open while the tab is still detecting its language.
+    connect(tab, &EditorTab::spellingDictionariesChanged, this, [this, tab = QPointer<EditorTab>(tab)]() {
+        if (tab) offerWordFrequencies(tab->spellingDictionaries());
+    }, Qt::QueuedConnection);
+    QTimer::singleShot(0, this, [this, tab = QPointer<EditorTab>(tab)]() {
+        if (tab) offerWordFrequencies(tab->spellingDictionaries());
     });
     updateWindowTitle();
     updateStatusBar(tab);
@@ -694,6 +729,65 @@ void EditorWindow::updateSyntaxData()
     if (downloader()->busy()) return;
     statusBar()->showMessage(tr("Downloading syntax definitions…"));
     downloader()->start();
+}
+
+qce::spell::WordFrequencyDownloader* EditorWindow::frequencyDownloader()
+{
+    if (m_frequencyDownloader) return m_frequencyDownloader;
+    m_frequencyDownloader = new qce::spell::WordFrequencyDownloader(this);
+    connect(m_frequencyDownloader, &qce::spell::WordFrequencyDownloader::finished, this,
+            [this](bool ok, const QString& error) {
+        statusBar()->showMessage(ok ? tr("Word frequencies downloaded; suggestions put common words first")
+                                    : tr("Word frequencies not downloaded: %1").arg(error),
+                                 8000);
+        downloadNextWordFrequencies();
+    });
+    return m_frequencyDownloader;
+}
+
+// Asked once; afterwards the list of each new language is fetched without a
+// question (or never). Each dictionary is tried once a session, so a language
+// without a list is not fetched again and again.
+void EditorWindow::offerWordFrequencies(const QStringList& dictionaries)
+{
+    QStringList missing;
+    for (const QString& dictionary : dictionaries)
+        if (!m_frequencyTried.contains(dictionary) && !qce::spell::hasWordFrequencies(dictionary))
+            missing << dictionary;
+    if (missing.isEmpty()) return;
+    if (!settings().value(kWordFrequenciesKey).isValid()) {
+        if (m_askingWordFrequencies) return;
+        QScopedValueRollback asking(m_askingWordFrequencies, true);
+        QStringList names;
+        for (const QString& dictionary : missing) names << dictionaryDisplayName(dictionary);
+        const auto answer = QMessageBox::question(
+            this, tr("Word Frequencies for Spelling"),
+            tr("Spelling suggestions can put common words before rare ones. Download the list of the most "
+               "frequent words for %1 from GitHub?\n\n"
+               "Source: %2, under 1 MB per language. Stored in:\n%3\n\n"
+               "Lists for other languages are then downloaded when they are first needed; "
+               "Tools > Download Word Frequencies for Spelling turns this off.")
+                .arg(names.join(QStringLiteral(", ")), qce::spell::WordFrequencyDownloader::sourceDescription(),
+                     qce::spell::wordFrequencyListDir()),
+            QMessageBox::Yes | QMessageBox::No, QMessageBox::Yes);
+        settings().setValue(kWordFrequenciesKey, answer == QMessageBox::Yes);
+        const QSignalBlocker blocker(m_wordFrequencies);
+        m_wordFrequencies->setChecked(answer == QMessageBox::Yes);
+    }
+    if (!settings().value(kWordFrequenciesKey, false).toBool()) return;
+    for (const QString& dictionary : missing) {
+        m_frequencyTried.insert(dictionary);
+        if (!m_frequencyQueue.contains(dictionary)) m_frequencyQueue << dictionary;
+    }
+    downloadNextWordFrequencies();
+}
+
+void EditorWindow::downloadNextWordFrequencies()
+{
+    if (m_frequencyQueue.isEmpty() || frequencyDownloader()->busy()) return;
+    const QString dictionary = m_frequencyQueue.takeFirst();
+    statusBar()->showMessage(tr("Downloading word frequencies for %1…").arg(dictionaryDisplayName(dictionary)));
+    frequencyDownloader()->start(dictionary);
 }
 
 // Only the code pages of the chosen languages are considered for files not in

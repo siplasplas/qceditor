@@ -26,13 +26,14 @@ endif()
 # 1.19: qcodeedit-diff, a reload changes only the differing lines as an undo step
 # 1.20.1: spelling suggestions over all forms of the dictionary, usually one
 # 1.21: corrections of a space missing or misplaced (phraseCorrections)
-foreach(package qcodeedit qcodeedit-kate qcodeedit-katedata qcodeedit-encoding qcodeedit-spell qcodeedit-diff)
+# 1.22: suggestions ranked by word frequency, qcodeedit-spelldata downloads the lists
+foreach(package qcodeedit qcodeedit-kate qcodeedit-katedata qcodeedit-encoding qcodeedit-spell qcodeedit-spelldata qcodeedit-diff)
     string(REPLACE "qcodeedit-" "" component ${package})
     if(package STREQUAL "qcodeedit")
         set(component qcodeedit)
     endif()
     if(NOT TARGET qcodeedit::${component})
-        find_package(${package} 1.21.0 REQUIRED)
+        find_package(${package} 1.22.0 REQUIRED)
     endif()
 endforeach()
 

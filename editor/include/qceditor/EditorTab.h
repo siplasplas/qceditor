@@ -142,6 +142,10 @@ public:
     /// syntax data has been downloaded or updated).
     void reapplyHighlighter();
 
+    /// The spelling dictionaries in use (e.g. "pl_PL"); empty while spell
+    /// checking is off.
+    QStringList spellingDictionaries() const;
+
     qce::CodeEdit*           editor()   { return m_edit; }
     qce::SimpleTextDocument* document() { return m_doc; }
 
@@ -151,6 +155,9 @@ signals:
     void modificationChanged(bool modified);
     /// Encoding, line breaks or language changed (status bar refresh).
     void statusChanged();
+    /// The spelling dictionaries in use changed (e.g. the detected language),
+    /// or spell checking was turned on or off; see spellingDictionaries().
+    void spellingDictionariesChanged();
 
 private:
     /// Empty `encoding` detects it. A reload (`asEdit`) keeps the undo

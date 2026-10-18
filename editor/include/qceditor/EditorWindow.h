@@ -1,6 +1,7 @@
 #pragma once
 #include <QMainWindow>
 #include <QPointer>
+#include <QSet>
 #include <QStringList>
 #include <functional>
 #include <mrutabwidget.h>
@@ -10,6 +11,7 @@ class QLabel;
 class QMenu;
 class QTimer;
 namespace qce::kate { class KateDataDownloader; }
+namespace qce::spell { class WordFrequencyDownloader; }
 
 namespace qceditor {
 
@@ -111,6 +113,13 @@ private:
     void offerSyntaxDownload();
     void updateSyntaxData();
 
+    qce::spell::WordFrequencyDownloader* frequencyDownloader();
+    /// Word frequencies for the dictionaries' languages that have none: asked
+    /// once, then downloaded when needed (Tools > Download Word Frequencies
+    /// for Spelling).
+    void offerWordFrequencies(const QStringList& dictionaries);
+    void downloadNextWordFrequencies();
+
     template <typename F> void forEachTab(F function) const;
 
     EditorWindowOptions m_options;
@@ -138,6 +147,12 @@ private:
     /// Tab that the tab limit question decided to close; not asked about again.
     QPointer<QWidget> m_limitClosePage;
     qce::kate::KateDataDownloader* m_downloader = nullptr;
+    QAction* m_wordFrequencies = nullptr;
+    qce::spell::WordFrequencyDownloader* m_frequencyDownloader = nullptr;
+    QStringList m_frequencyQueue;
+    /// Dictionaries whose list was fetched or tried in this session.
+    QSet<QString> m_frequencyTried;
+    bool m_askingWordFrequencies = false;
 };
 
 } // namespace qceditor

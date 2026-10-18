@@ -139,6 +139,14 @@ only those nearly as good as the best are offered (qcodeedit 1.20). A space
 missing or typed in the wrong place comes first: for "n aoknie" the menu on
 "aoknie" offers "na oknie", for "mam yz" it offers "mamy z", replacing both
 words.
+Common words come before rare ones ("dialac": działać, not dialach) once the
+list of the most frequent words of the language is there. The first time a
+dictionary without one is used, the editor asks whether to download it
+(FrequencyWords, from film subtitles, CC-BY-SA 4.0, under 1 MB per language,
+from GitHub, into `~/.local/share/word-frequencies`, shared with other
+programs); after a Yes the lists of other languages are downloaded when first
+needed, without asking. **Tools > Download Word Frequencies for Spelling**
+turns this on or off. Without the lists suggestions work as before.
 The language is the detected one; **Spelling Language** in the context menu
 chooses another for the document, from the recently used ones, up to two at
 once (e.g. English + Polish), or **More…** for every dictionary hunspell has

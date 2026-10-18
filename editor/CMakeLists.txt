@@ -50,6 +50,7 @@ target_link_libraries(qceditor-editor
     PRIVATE
         qcodeedit::katedata
         qcodeedit::spell
+        qcodeedit::spelldata
         qcodeedit::diff
         PkgConfig::QCEDITOR_BOTAN
 )
