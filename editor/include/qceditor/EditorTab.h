@@ -1,6 +1,7 @@
 #pragma once
 #include <QWidget>
 #include <QPalette>
+#include <QPointer>
 #include <QDateTime>
 #include <qce/kate/KateTheme.h>
 #include <memory>
@@ -17,7 +18,7 @@ class QLabel;
 class QMenu;
 class QVBoxLayout;
 namespace qce::encoding { class EncodingGuard; }
-namespace qce::spell { class CodeEditSpelling; }
+namespace qce::spell { class CodeEditSpelling; class SpellingReviewDialog; }
 
 namespace qceditor {
 
@@ -141,7 +142,8 @@ public:
     void showSpellingCorrections();
     /// The misspelled words of the selection (or the whole text) in a window
     /// to confirm their corrections, applied as one undo step (Tools > Review
-    /// Spelling).
+    /// Spelling). The window is not modal; the tab is read-only while it is
+    /// open.
     void reviewSpelling();
     /// The user's own words and corrections, to look over or remove (Tools >
     /// User Dictionary); recheck the tabs afterwards.
@@ -233,6 +235,8 @@ private:
     QLabel* m_encodingNoticeText = nullptr;
     qce::encoding::EncodingDetection m_uncertain;
     qce::spell::CodeEditSpelling* m_spelling = nullptr;
+    /// The open Review Spelling window (not modal; the tab is read-only meanwhile).
+    QPointer<qce::spell::SpellingReviewDialog> m_review;
     QStringList m_spellLanguages;  ///< chosen for this document; empty = detected
     QString m_spellMissing;        ///< language whose missing dictionary was reported
     qce::encoding::EncodingGuard* m_encoding = nullptr;

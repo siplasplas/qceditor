@@ -750,11 +750,22 @@ void EditorTab::recheckSpelling()
 
 void EditorTab::reviewSpelling()
 {
+    // One window a tab: a second request brings it to the front.
+    if (m_review) {
+        m_review->raise();
+        m_review->activateWindow();
+        return;
+    }
     // What the window checks at first is the program's setting.
-    auto checkedAtFirst = qce::spell::checkedAtFirstFromName(settings().value(kReviewCheckedAtFirstKey).toString());
-    const int corrected = qce::spell::reviewSpelling(*m_spelling, checkedAtFirst, this);
-    settings().setValue(kReviewCheckedAtFirstKey, qce::spell::checkedAtFirstName(checkedAtFirst));
-    if (corrected > 0) emit message(tr("%n word(s) corrected; Ctrl+Z undoes it", nullptr, corrected));
+    const auto checkedAtFirst =
+        qce::spell::checkedAtFirstFromName(settings().value(kReviewCheckedAtFirstKey).toString());
+    m_review = qce::spell::openSpellingReview(*m_spelling, checkedAtFirst, this);
+    if (!m_review) return;
+    connect(m_review, &qce::spell::SpellingReviewDialog::reviewFinished, this,
+            [this](int corrected, qce::spell::CheckedAtFirst chosen) {
+        settings().setValue(kReviewCheckedAtFirstKey, qce::spell::checkedAtFirstName(chosen));
+        if (corrected > 0) emit message(tr("%n word(s) corrected; Ctrl+Z undoes it", nullptr, corrected));
+    });
 }
 
 void EditorTab::addSpellingMenu(QMenu& menu, const QPoint& position)

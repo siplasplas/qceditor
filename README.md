@@ -147,7 +147,9 @@ from GitHub, into `~/.local/share/word-frequencies`, shared with other
 programs); after a Yes the lists of other languages are downloaded when first
 needed, without asking. **Tools > Download Word Frequencies for Spelling**
 turns this on or off. Without the lists suggestions work as before.
-**Tools > Review Spelling** (F7) lists the misspelled words of the selection,
+**Tools > Review Spelling** (F7) opens a window, not modal (the tab is
+read-only while it is open, the other tabs and windows go on), with the
+misspelled words of the selection,
 or of the whole text, with a correction for each, their line and context.
 **Checked at first** chooses which words are checked when it opens: the sure
 corrections only (a single suggestion close to the word, e.g. "bhyc" → być, not
