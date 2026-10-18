@@ -46,7 +46,7 @@ changed on disk ask to reload (`EditorWindowOptions`). `cmake --install build` i
 CMake package (not the application):
 
 ```cmake
-find_package(qceditor 1.0 REQUIRED)
+find_package(qceditor 1.1 REQUIRED)
 target_link_libraries(my_app PRIVATE qceditor::editor)
 ```
 
