@@ -148,6 +148,9 @@ public:
     /// The user's own words and corrections, to look over or remove (Tools >
     /// User Dictionary); recheck the tabs afterwards.
     void showUserDictionary();
+    /// Its Review Spelling window is open (the tab is read-only, and is not
+    /// reloaded from disk meanwhile).
+    bool spellingReviewOpen() const;
     /// Checks the visible text again (e.g. after the user dictionary changed).
     void recheckSpelling();
     /// Spelling dictionaries chosen for this document (e.g. en_US, pl_PL);

@@ -645,7 +645,9 @@ void EditorWindow::checkExternalChanges()
     bool reloaded = false;
     for (int i = 0; i < m_tabs->count(); ++i) {
         QPointer<EditorTab> tab = tabAt(i);
-        if (!tab || !tab->hasExternalChanges()) continue;
+        // Not while its Review Spelling window is open: the reviewed text
+        // stays as it was; the next check after it closes reloads it.
+        if (!tab || tab->spellingReviewOpen() || !tab->hasExternalChanges()) continue;
         if (tab->isModified()) {
             if (!askToReloadModified()) continue;
             m_tabs->setCurrentWidget(tab);

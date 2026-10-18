@@ -743,6 +743,11 @@ void EditorTab::showUserDictionary()
     qce::spell::UserDictionaryDialog(m_spelling->checker(), this).exec();
 }
 
+bool EditorTab::spellingReviewOpen() const
+{
+    return !m_review.isNull();
+}
+
 void EditorTab::recheckSpelling()
 {
     m_spelling->recheck();

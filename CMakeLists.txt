@@ -35,13 +35,14 @@ endif()
 # 1.30: the score column and sorting in the review
 # 1.35: the user's own corrections, UserDictionaryDialog
 # 1.37: openSpellingReview(), a Review Spelling window that is not modal
+# 1.38: suggestions kept, a second review at once
 foreach(package qcodeedit qcodeedit-kate qcodeedit-katedata qcodeedit-encoding qcodeedit-spell qcodeedit-spelldata qcodeedit-diff)
     string(REPLACE "qcodeedit-" "" component ${package})
     if(package STREQUAL "qcodeedit")
         set(component qcodeedit)
     endif()
     if(NOT TARGET qcodeedit::${component})
-        find_package(${package} 1.37.0 REQUIRED)
+        find_package(${package} 1.38.0 REQUIRED)
     endif()
 endforeach()
 

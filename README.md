@@ -148,7 +148,8 @@ programs); after a Yes the lists of other languages are downloaded when first
 needed, without asking. **Tools > Download Word Frequencies for Spelling**
 turns this on or off. Without the lists suggestions work as before.
 **Tools > Review Spelling** (F7) opens a window, not modal (the tab is
-read-only while it is open, the other tabs and windows go on), with the
+read-only and not reloaded from disk while it is open, the other tabs and
+windows go on), with the
 misspelled words of the selection,
 or of the whole text, with a correction for each, their line and context.
 **Checked at first** chooses which words are checked when it opens: the sure
@@ -163,7 +164,9 @@ or only the unchecked ones (left to decide); Ctrl+C or the context menu copies
 the selected rows (word, correction, score, line and the whole line of text,
 separated by tabs) or only their lines of text. The
 window says how long finding the corrections took (seconds, and milliseconds a
-word). **Add to Dictionary** and **Ignore** take the selected word out of the
+word); the tab keeps what it found, so opening the window again looks only for
+words it has not seen (about 45 s the first time and under a second afterwards
+for 6000 misspelled words). **Add to Dictionary** and **Ignore** take the selected word out of the
 list, every row of it (an English or coined word written on purpose);
 **Remember Correction** keeps the selected word's chosen correction as your own
 (e.g. "Paypal" → PayPal): from then on it is that word's only suggestion, with
