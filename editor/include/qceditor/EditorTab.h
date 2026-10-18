@@ -16,9 +16,12 @@ class QFrame;
 class QLabel;
 class QMenu;
 class QVBoxLayout;
-class FindBar;
 namespace qce::encoding { class EncodingGuard; }
 namespace qce::spell { class CodeEditSpelling; }
+
+namespace qceditor {
+
+class FindBar;
 
 class EditorTab : public QWidget
 {
@@ -144,3 +147,5 @@ private:
     QString m_filePath;
     bool    m_modified = false;
 };
+
+} // namespace qceditor

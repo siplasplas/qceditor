@@ -6,8 +6,11 @@
 class QLineEdit;
 class QLabel;
 class QToolButton;
-class EditorTab;
 class QPushButton;
+
+namespace qceditor {
+
+class EditorTab;
 
 class FindBar : public QWidget
 {
@@ -61,3 +64,5 @@ private:
     QStringList m_captureNames;
     QVector<Match> m_excluded;
 };
+
+} // namespace qceditor

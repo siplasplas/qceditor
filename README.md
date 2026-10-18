@@ -31,6 +31,23 @@ cmake --build build
 For dependencies installed outside the default search paths, pass
 `-DCMAKE_PREFIX_PATH=/path/to/prefix` when configuring.
 
+### The editor library
+
+The editor itself (editor tabs with search and replace, Kate syntax,
+encodings and spelling) is the static library `qceditor-editor` in `editor/`,
+shared with other programs such as gemini-commander; the application is a
+thin layer over it. `cmake --install build` installs the library and its
+CMake package (not the application):
+
+```cmake
+find_package(qceditor 1.0 REQUIRED)
+target_link_libraries(my_app PRIVATE qceditor::editor)
+```
+
+Each program keeps the editor's settings in its own place: it passes its own
+`qceditor::Settings` to `qceditor::setSettings()`; without it the editor uses
+the application's QSettings.
+
 Tabs support reordering, pinning, Ctrl+Tab MRU navigation and bulk closing.
 The unpinned tab limit is 20. Closing a modified tab asks whether to save
 that document, including when it is not the active tab. qt-extra 2.x keeps

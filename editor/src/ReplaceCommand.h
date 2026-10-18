@@ -4,6 +4,8 @@
 #include <QPointer>
 #include <QUndoCommand>
 
+namespace qceditor {
+
 // Use the editor's undo stack while its public editing API exposes only the document.
 class ReplaceCommand : public QUndoCommand
 {
@@ -33,3 +35,5 @@ private:
     QString m_replacement, m_original;
     qce::TextCursor m_cursor, m_anchor;
 };
+
+} // namespace qceditor

@@ -4,8 +4,9 @@
 #include <QStringList>
 
 class MruTabWidget;
-class EditorTab;
 class QLabel;
+namespace qceditor { class EditorTab; }
+using qceditor::EditorTab;
 class QMenu;
 namespace qce::kate { class KateDataDownloader; }
 

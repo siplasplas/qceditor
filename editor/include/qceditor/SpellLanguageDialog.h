@@ -4,6 +4,8 @@
 
 class QListWidget;
 
+namespace qceditor {
+
 /// Chooses one or two spelling dictionaries among all hunspell has installed
 /// (e.g. English + Polish), with a hint how to install another language.
 class SpellLanguageDialog : public QDialog
@@ -21,3 +23,5 @@ private:
     QListWidget* m_list = nullptr;
     QStringList m_order;  ///< checked dictionaries, oldest first
 };
+
+} // namespace qceditor

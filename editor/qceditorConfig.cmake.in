@@ -1,0 +1,12 @@
+@PACKAGE_INIT@
+
+include(CMakeFindDependencyMacro)
+find_dependency(Qt6 6.2 COMPONENTS Widgets)
+find_dependency(qcodeedit 1.15.1)
+find_dependency(qcodeedit-kate 1.15.1)
+find_dependency(qcodeedit-encoding 1.15.1)
+find_dependency(qcodeedit-spell 1.15.1)
+
+include("${CMAKE_CURRENT_LIST_DIR}/qceditorTargets.cmake")
+
+check_required_components(qceditor)

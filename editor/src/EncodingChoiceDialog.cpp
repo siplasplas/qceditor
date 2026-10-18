@@ -1,4 +1,4 @@
-#include "encodingchoicedialog.h"
+#include <qceditor/EncodingChoiceDialog.h>
 
 #include <QComboBox>
 #include <QDialogButtonBox>
@@ -9,6 +9,8 @@
 #include <QPushButton>
 #include <QTableWidget>
 #include <QVBoxLayout>
+
+namespace qceditor {
 
 namespace {
 
@@ -141,3 +143,5 @@ void EncodingChoiceDialog::highlightChosenColumn()
         }
     }
 }
+
+} // namespace qceditor

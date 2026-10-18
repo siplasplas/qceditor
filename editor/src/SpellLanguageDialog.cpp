@@ -1,10 +1,12 @@
-#include "spelllanguagedialog.h"
+#include <qceditor/SpellLanguageDialog.h>
 
 #include <QDialogButtonBox>
 #include <QLabel>
 #include <QListWidget>
 #include <QVBoxLayout>
 #include <qce/spell/SpellChecker.h>
+
+namespace qceditor {
 
 SpellLanguageDialog::SpellLanguageDialog(const QStringList& chosen, QWidget* parent)
     : QDialog(parent)
@@ -64,3 +66,5 @@ QStringList SpellLanguageDialog::chosenDictionaries() const
 {
     return m_order;
 }
+
+} // namespace qceditor

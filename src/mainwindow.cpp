@@ -1,5 +1,6 @@
 #include "mainwindow.h"
-#include "editortab.h"
+#include <qceditor/EditorTab.h>
+#include <qceditor/SyntaxData.h>
 #include <mrutabwidget.h>
 #include <QMenuBar>
 #include <QStatusBar>
@@ -34,7 +35,8 @@
 #include <qce/TextCursor.h>
 #include <qce/kate/KateDataDownloader.h>
 #include <qce/kate/KateSyntaxVersion.h>
-#include "syntaxdata.h"
+
+namespace SyntaxData = qceditor::SyntaxData;
 
 static constexpr int kRecentFilesLimit = 20;
 

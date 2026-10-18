@@ -7,6 +7,8 @@ set(CMAKE_AUTOMOC ON)
 set(CMAKE_AUTOUIC ON)
 set(CMAKE_AUTORCC ON)
 
+include(GNUInstallDirs)
+
 find_package(Qt6 6.2 REQUIRED COMPONENTS Core Gui Widgets)
 # 2.7: qxMigrateToSiplasplas() moves older versions' files at start-up
 find_package(qt-extra 2.7 REQUIRED)
@@ -19,27 +21,15 @@ find_package(qcodeedit-katedata 1.15.1 REQUIRED)
 find_package(qcodeedit-encoding 1.15.1 REQUIRED)
 find_package(qcodeedit-spell 1.15.1 REQUIRED)
 
-set(SOURCES
+# The editor itself, shared with other programs (e.g. gemini-commander).
+add_subdirectory(editor)
+
+# The application: a thin layer over the editor library.
+add_executable(qceditor
     src/main.cpp
     src/mainwindow.cpp
-    src/findbar.cpp
-    src/editortab.cpp
-    src/encodingchoicedialog.cpp
-    src/spelllanguagedialog.cpp
-    src/syntaxdata.cpp
-)
-
-set(HEADERS
     src/mainwindow.h
-    src/replacecommand.h
-    src/findbar.h
-    src/editortab.h
-    src/encodingchoicedialog.h
-    src/spelllanguagedialog.h
-    src/syntaxdata.h
 )
-
-add_executable(qceditor ${SOURCES} ${HEADERS})
 
 target_include_directories(qceditor PRIVATE src)
 
@@ -48,9 +38,6 @@ target_link_libraries(qceditor PRIVATE
     Qt6::Gui
     Qt6::Widgets
     qt-extra
-    qcodeedit::qcodeedit
-    qcodeedit::kate
+    qceditor::editor
     qcodeedit::katedata
-    qcodeedit::encoding
-    qcodeedit::spell
 )

@@ -1,7 +1,9 @@
-#include "editortab.h"
-#include "findbar.h"
-#include "encodingchoicedialog.h"
-#include "spelllanguagedialog.h"
+#include <qceditor/EditorTab.h>
+#include <qceditor/FindBar.h>
+#include <qceditor/EncodingChoiceDialog.h>
+#include <qceditor/Settings.h>
+#include <qceditor/SpellLanguageDialog.h>
+#include <qceditor/SyntaxData.h>
 #include <QLocale>
 #include <qce/spell/CodeEditSpelling.h>
 #include <QFrame>
@@ -18,7 +20,6 @@
 #include <QMap>
 #include <QMessageBox>
 #include <QSaveFile>
-#include <QSettings>
 #include <QSignalBlocker>
 #include <algorithm>
 #include <functional>
@@ -29,7 +30,8 @@
 #include <qce/kate/KateTheme.h>
 #include <qce/kate/KatePaths.h>
 #include <qce/kate/KateXmlReader.h>
-#include "syntaxdata.h"
+
+namespace qceditor {
 
 // Used only when no Kate definition matches (e.g. data not downloaded yet).
 static bool isCppExtension(const QString& ext)
@@ -311,12 +313,12 @@ static constexpr int kRecentSpellingCount = 6;
 
 bool EditorTab::spellCheckingEnabled()
 {
-    return QSettings().value(kSpellingEnabledKey, true).toBool();
+    return settings().value(kSpellingEnabledKey, true).toBool();
 }
 
 void EditorTab::setSpellCheckingEnabled(bool enabled)
 {
-    QSettings().setValue(kSpellingEnabledKey, enabled);
+    settings().setValue(kSpellingEnabledKey, enabled);
 }
 
 void EditorTab::updateSpellChecking()
@@ -328,12 +330,12 @@ void EditorTab::setSpellLanguages(const QStringList& dictionaries)
 {
     m_spellLanguages = dictionaries;
     // The chosen ones become the most recent in the Spelling Language menu.
-    QStringList recent = QSettings().value(kRecentSpellingKey).toStringList();
+    QStringList recent = settings().value(kRecentSpellingKey).toStringList();
     for (auto it = dictionaries.crbegin(); it != dictionaries.crend(); ++it) {
         recent.removeAll(*it);
         recent.prepend(*it);
     }
-    QSettings().setValue(kRecentSpellingKey, recent.mid(0, kRecentSpellingCount));
+    settings().setValue(kRecentSpellingKey, recent.mid(0, kRecentSpellingCount));
     applySpellLanguages();
 }
 
@@ -390,7 +392,7 @@ void EditorTab::addSpellingMenu(QMenu& menu, const QPoint& position)
     automatic->setChecked(m_spellLanguages.isEmpty());
     connect(automatic, &QAction::triggered, this, [this]() { setSpellLanguages({}); });
     languageMenu->addSeparator();
-    QStringList candidates = QSettings().value(kRecentSpellingKey).toStringList();
+    QStringList candidates = settings().value(kRecentSpellingKey).toStringList();
     for (const QString& name : m_spelling->dictionaries())
         if (!candidates.contains(name)) candidates << name;
     for (const QString& name : candidates) {
@@ -418,14 +420,13 @@ static const char* kLegacyLanguagesKey = "encoding/legacyLanguages";
 
 QStringList EditorTab::legacyLanguages()
 {
-    return QSettings().value(kLegacyLanguagesKey).toStringList();
+    return settings().value(kLegacyLanguagesKey).toStringList();
 }
 
 void EditorTab::setLegacyLanguages(const QStringList& languages)
 {
-    QSettings settings;
-    if (languages.isEmpty()) settings.remove(kLegacyLanguagesKey);
-    else settings.setValue(kLegacyLanguagesKey, languages);
+    if (languages.isEmpty()) settings().remove(kLegacyLanguagesKey);
+    else settings().setValue(kLegacyLanguagesKey, languages);
 }
 
 void EditorTab::reopenAsking(const QString& name)
@@ -880,3 +881,5 @@ void EditorTab::clearHighlighter()
     m_highlighter.reset();
     m_foldProvider.reset();
 }
+
+} // namespace qceditor

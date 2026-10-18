@@ -1,6 +1,6 @@
-#include "findbar.h"
-#include "editortab.h"
-#include "replacecommand.h"
+#include <qceditor/FindBar.h>
+#include <qceditor/EditorTab.h>
+#include "ReplaceCommand.h"
 #include <qce/CodeEditArea.h>
 #include <qce/WordBoundary.h>
 #include <QHBoxLayout>
@@ -16,6 +16,8 @@
 #include <QSignalBlocker>
 #include <QEvent>
 #include <algorithm>
+
+namespace qceditor {
 
 FindBar::FindBar(EditorTab* tab) : QWidget(tab), m_tab(tab)
 {
@@ -377,3 +379,5 @@ void FindBar::excludeCurrent()
     if (m_matches.isEmpty()) { m_current = -1; updateHighlights(); }
     else activate(std::min(current, int(m_matches.size()) - 1));
 }
+
+} // namespace qceditor

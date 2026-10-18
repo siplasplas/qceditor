@@ -8,6 +8,8 @@ class QComboBox;
 class QListWidget;
 class QTableWidget;
 
+namespace qceditor {
+
 /// Lets the user choose a file's encoding when detection is not sure: the
 /// plausible encodings with their language and probability, and a preview of
 /// the lines where they decode the file differently (in the order qcodeedit
@@ -35,3 +37,5 @@ private:
     QTableWidget* m_preview = nullptr;
     QComboBox* m_other = nullptr;
 };
+
+} // namespace qceditor

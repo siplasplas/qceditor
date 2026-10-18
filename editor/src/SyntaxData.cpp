@@ -1,8 +1,8 @@
-#include "syntaxdata.h"
+#include <qceditor/SyntaxData.h>
 
 #include <qce/kate/KatePaths.h>
 
-namespace SyntaxData {
+namespace qceditor::SyntaxData {
 
 static qce::kate::KateSyntaxIndex& storage()
 {
@@ -26,4 +26,4 @@ void reload()
     idx.saveIfDirty();
 }
 
-} // namespace SyntaxData
+} // namespace qceditor::SyntaxData
