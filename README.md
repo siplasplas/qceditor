@@ -4,7 +4,7 @@ Editor that uses qcodeedit and the shared MruTabWidget from qt-extra.
 
 ## Building
 
-Requires C++17, CMake 3.16+, Qt 6.2+, installed qcodeedit 1.12.0 packages
+Requires C++17, CMake 3.16+, Qt 6.2+, installed qcodeedit 1.13.0 packages
 (`qcodeedit`, `qcodeedit-kate`, `qcodeedit-katedata`, `qcodeedit-encoding`,
 the last one with [cpg](https://github.com/siplasplas/cpg)) and qt-extra 2.7 or
 later (moving older versions' files, see below).
@@ -117,8 +117,13 @@ and `~/.config/siplasplas/qceditor/`, and its data (the recent files) in
 `~/.local/share/qceditor/config.json` and `~/.config/qceditor/QCEditor.conf`, are
 moved there once at start-up (qt-extra's `qxMigrateToSiplasplas()`) and the
 emptied old directories removed; files there that QCEditor does not recognize are
-moved only when you agree. The Kate syntax data belongs to qcodeedit and stays in
-its own place.
+moved only when you agree.
+
+The Kate syntax definitions and themes are qcodeedit's shared data, in
+`~/.local/share/kate-data/<version>/` (usable by other programs too). Up to
+qcodeedit 1.12 they were in `~/.local/share/qcodeedit/kate-<version>/`; QCEditor
+moves them once at start-up (`qce::kate::migrateDataRoot()`), so they are not
+downloaded again.
 
 When the main window becomes active (for example after Alt+Tab), QCEditor
 compares modification times and sizes of all files open in tabs with their

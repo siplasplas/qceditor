@@ -7,6 +7,7 @@
 #include <QStandardPaths>
 #include <QStatusBar>
 #include <qce/encoding/Encoding.h>
+#include <qce/kate/KatePaths.h>
 #include <qxmigration.h>
 #include "mainwindow.h"
 
@@ -71,6 +72,14 @@ int main(int argc, char* argv[])
         recentFilesPath = QDir(QStandardPaths::writableLocation(QStandardPaths::GenericDataLocation))
                               .filePath(QStringLiteral("qceditor/config.json"));
     }
+
+    // The Kate syntax data is qcodeedit's: up to qcodeedit 1.12 it was in
+    // ~/.local/share/qcodeedit, now in the shared ~/.local/share/kate-data.
+    const qce::kate::DataRootMigration kateMoved = qce::kate::migrateDataRoot();
+    for (const QString& line : kateMoved.log)
+        qInfo("Moving Kate data: %s", qPrintable(line));
+    for (const QString& line : kateMoved.warnings)
+        qWarning("Moving Kate data: %s", qPrintable(line));
 
     // Encoding/language models load in the background while the window opens.
     qce::encoding::preloadDetectionData();

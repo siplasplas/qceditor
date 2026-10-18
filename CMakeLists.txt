@@ -10,10 +10,11 @@ set(CMAKE_AUTORCC ON)
 find_package(Qt6 6.2 REQUIRED COMPONENTS Core Gui Widgets)
 # 2.7: qxMigrateToSiplasplas() moves older versions' files at start-up
 find_package(qt-extra 2.7 REQUIRED)
-find_package(qcodeedit 1.12.0 REQUIRED)
-find_package(qcodeedit-kate REQUIRED)
-find_package(qcodeedit-katedata REQUIRED)
-find_package(qcodeedit-encoding 1.12.0 REQUIRED)
+# 1.13: Kate data in ~/.local/share/kate-data, qce::kate::migrateDataRoot()
+find_package(qcodeedit 1.13.0 REQUIRED)
+find_package(qcodeedit-kate 1.13.0 REQUIRED)
+find_package(qcodeedit-katedata 1.13.0 REQUIRED)
+find_package(qcodeedit-encoding 1.13.0 REQUIRED)
 
 set(SOURCES
     src/main.cpp
