@@ -62,6 +62,10 @@ public:
     /// Opens a file; the undo history starts anew.
     bool loadFile(const QString& path);
     bool hasExternalChanges() const;
+    /// Takes the file as it is on disk now as the known version, so that
+    /// hasExternalChanges() reports only later changes (e.g. after the user
+    /// declined loading it).
+    void ignoreExternalChanges() { updateDiskStamp(); }
     /// Reads the file again: only the lines that changed on disk are changed,
     /// as one undo step, so Ctrl+Z brings back the text before the reload.
     bool reloadFromDisk();

@@ -1,8 +1,10 @@
-# qceditor-editor: the editor shared by qceditor and other programs: editor
-# tabs with search and replace, Kate syntax, encodings and spelling. Each
-# program keeps the editor's settings in its own place (qceditor::Settings).
+# qceditor-editor: the editor shared by qceditor and other programs: the
+# editor window with its tabs, menus and status bar, editor tabs with search
+# and replace, Kate syntax, encodings and spelling. Each program keeps the
+# editor's settings in its own place (qceditor::Settings).
 
 add_library(qceditor-editor STATIC
+    src/EditorWindow.cpp
     src/EditorTab.cpp
     src/FindBar.cpp
     src/EncodingChoiceDialog.cpp
@@ -10,6 +12,7 @@ add_library(qceditor-editor STATIC
     src/SyntaxData.cpp
     src/Settings.cpp
     src/ReplaceCommand.h
+    include/qceditor/EditorWindow.h
     include/qceditor/EditorTab.h
     include/qceditor/FindBar.h
     include/qceditor/EncodingChoiceDialog.h
@@ -29,10 +32,12 @@ target_include_directories(qceditor-editor
 target_link_libraries(qceditor-editor
     PUBLIC
         Qt6::Widgets
+        qt-extra
         qcodeedit::qcodeedit
         qcodeedit::kate
         qcodeedit::encoding
     PRIVATE
+        qcodeedit::katedata
         qcodeedit::spell
         qcodeedit::diff
 )
@@ -47,6 +52,7 @@ install(TARGETS qceditor-editor
     ARCHIVE DESTINATION ${CMAKE_INSTALL_LIBDIR}
 )
 install(FILES
+    include/qceditor/EditorWindow.h
     include/qceditor/EditorTab.h
     include/qceditor/FindBar.h
     include/qceditor/EncodingChoiceDialog.h

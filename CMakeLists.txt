@@ -27,14 +27,11 @@ find_package(qcodeedit-diff 1.19.0 REQUIRED)
 # The editor itself, shared with other programs (e.g. gemini-commander).
 add_subdirectory(editor)
 
-# The application: a thin layer over the editor library.
-add_executable(qceditor
-    src/main.cpp
-    src/mainwindow.cpp
-    src/mainwindow.h
-)
-
-target_include_directories(qceditor PRIVATE src)
+# The application: a thin layer over the editor library (its window, plus
+# moving older versions' files and keeping the recent files in its data
+# directory).
+add_executable(qceditor src/main.cpp)
+target_compile_definitions(qceditor PRIVATE QCEDITOR_VERSION="${PROJECT_VERSION}")
 
 target_link_libraries(qceditor PRIVATE
     Qt6::Core

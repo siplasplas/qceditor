@@ -34,10 +34,15 @@ For dependencies installed outside the default search paths, pass
 
 ### The editor library
 
-The editor itself (editor tabs with search and replace, Kate syntax,
-encodings and spelling) is the static library `qceditor-editor` in `editor/`,
-shared with other programs such as gemini-commander; the application is a
-thin layer over it. `cmake --install build` installs the library and its
+The editor itself (the window `qceditor::EditorWindow` with its tabs, menus
+and status bar, editor tabs with search and replace, Kate syntax, encodings
+and spelling) is the static library `qceditor-editor` in `editor/`, shared
+with other programs such as gemini-commander; the application is a thin
+layer over it (`src/main.cpp`). A program can add its own menu items through
+the window's menus, its own items to the tab bar's context menu
+(`tabContextMenuRequested`), check a file before it is saved
+(`setSaveValidator()`), and choose the tab limit and whether modified files
+changed on disk ask to reload (`EditorWindowOptions`). `cmake --install build` installs the library and its
 CMake package (not the application):
 
 ```cmake
@@ -50,9 +55,24 @@ Each program keeps the editor's settings in its own place: it passes its own
 the application's QSettings.
 
 Tabs support reordering, pinning, Ctrl+Tab MRU navigation and bulk closing.
-The unpinned tab limit is 20. Closing a modified tab asks whether to save
-that document, including when it is not the active tab. qt-extra 2.x keeps
-tab state attached to the page when tabs move and provides a built-in pin icon.
+A tab is titled with its file name, made unique with a number when another
+open file has the same name (`a.txt (2)`); new documents are `Untitled-1`,
+`Untitled-2`, …, and the Ctrl+Tab list shows the last two path components.
+The window title shows the full path. The unpinned tab limit is 20: a new tab
+closes the least recently used one, without asking unless it has unsaved
+changes or its file was deleted on disk; then **Save and Close**, **Close
+Without Saving**, **Keep Open (Pin)** or **Cancel** (the new tab is not
+opened). Closing a modified tab asks whether to save that document, and
+closing a tab whose file was deleted on disk asks whether to save it back.
+The tab bar's context menu also has **Close Unmodified Tabs**, **Copy File
+Name** and **Copy Path**. qt-extra 2.x keeps tab state attached to the page
+when tabs move and provides a built-in pin icon.
+
+**View > Wrap Lines** (on by default) and **View > Show Special Characters**
+apply to all tabs and are remembered. **Tools > Insert Date**, **Insert Time**
+and **Insert Both Date and Time** insert e.g. `Sunday 2026-10-18` and
+`16:21:05` at the cursor. **Help > About** shows the version and where the
+syntax definitions are.
 
 The editor's context menu starts with the spelling corrections of the word
 under the mouse, then **Undo**, **Redo**, **Cut**, **Copy**, **Paste**,
@@ -134,7 +154,7 @@ selects the matched text; match decorations preserve syntax colors and do not
 re-tokenize the document. The original selection-only scope is captured before
 navigation changes the editor selection.
 
-Ctrl+R opens the replacement row. The arrow beside the search field expands
+Ctrl+R (or Ctrl+H) opens the replacement row. The arrow beside the search field expands
 or collapses it. **Replace** changes the active result; **Replace All** changes
 all included results in one undo step. **Exclude** skips the active result until
 the query/options or document change. **Aa** preserves upper/lower/title case.
@@ -181,10 +201,14 @@ qcodeedit 1.12 they were in `~/.local/share/qcodeedit/kate-<version>/`; QCEditor
 moves them once at start-up (`qce::kate::migrateDataRoot()`), so they are not
 downloaded again.
 
-When the main window becomes active (for example after Alt+Tab), QCEditor
-compares modification times and sizes of all files open in tabs with their
-last read/saved versions. Changed files reload automatically unless the tab
-has unsaved edits; then a confirmation asks before discarding those edits.
+When the main window becomes active (for example after Alt+Tab), and every
+second while it is, QCEditor compares modification times and sizes of all
+files open in tabs with their last read/saved versions. Changed files reload
+automatically unless the tab has unsaved edits; then, with **Tools > Ask to
+Reload Modified Files** (on by default), a question asks whether to load the
+disk version (Ctrl+Z brings the edits back); after **No** it is not asked
+again until the file changes once more. With the option off such a tab is
+left as it is.
 A reload changes only the lines that differ on disk, as one undo step: Ctrl+Z
 brings back the text before it, and the earlier undo history stays. The
 cursor and the selection follow the text they were in (a line added above
