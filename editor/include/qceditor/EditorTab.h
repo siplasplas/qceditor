@@ -124,7 +124,12 @@ public:
     /// Spell checking (Tools > Check Spelling), saved in the settings; on by default.
     static bool spellCheckingEnabled();
     static void setSpellCheckingEnabled(bool enabled);
-    /// Applies the setting to this tab.
+    /// A misspelled word with a single correction is corrected when a space
+    /// or punctuation is typed after it (Tools > Correct Spelling While
+    /// Typing), saved in the settings; off by default.
+    static bool correctWhileTyping();
+    static void setCorrectWhileTyping(bool correct);
+    /// Applies the settings to this tab.
     void updateSpellChecking();
     /// The corrections of the misspelled word at the cursor in a menu below
     /// it, to choose with the keyboard (Alt+Enter).

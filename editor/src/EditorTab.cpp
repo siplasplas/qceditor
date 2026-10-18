@@ -89,6 +89,11 @@ EditorTab::EditorTab(QWidget* parent)
     // the language follows the detected one until the user chooses.
     m_spelling = new qce::spell::CodeEditSpelling(m_edit->area(), this);
     m_spelling->setEnabled(spellCheckingEnabled());
+    m_spelling->setCorrectWhileTyping(correctWhileTyping());
+    connect(m_spelling, &qce::spell::CodeEditSpelling::corrected, this,
+            [this](const QString& typed, const QString& correction) {
+        emit message(tr("Corrected \"%1\" to \"%2\"; Ctrl+Z brings it back").arg(typed, correction));
+    });
     applySpellLanguages();
     // Alt+Enter: the corrections of the word at the cursor, without the mouse.
     for (const auto key : {Qt::Key_Return, Qt::Key_Enter}) {
@@ -601,6 +606,7 @@ void EditorTab::addEncodingMenu(QMenu& menu)
 
 static const char* kSpellingEnabledKey = "spelling/enabled";
 static const char* kRecentSpellingKey = "spelling/recentDictionaries";
+static const char* kCorrectWhileTypingKey = "spelling/correctWhileTyping";
 static constexpr int kRecentSpellingCount = 6;
 
 bool EditorTab::spellCheckingEnabled()
@@ -613,9 +619,20 @@ void EditorTab::setSpellCheckingEnabled(bool enabled)
     settings().setValue(kSpellingEnabledKey, enabled);
 }
 
+bool EditorTab::correctWhileTyping()
+{
+    return settings().value(kCorrectWhileTypingKey, false).toBool();
+}
+
+void EditorTab::setCorrectWhileTyping(bool correct)
+{
+    settings().setValue(kCorrectWhileTypingKey, correct);
+}
+
 void EditorTab::updateSpellChecking()
 {
     m_spelling->setEnabled(spellCheckingEnabled());
+    m_spelling->setCorrectWhileTyping(correctWhileTyping());
     emit spellingDictionariesChanged();
 }
 

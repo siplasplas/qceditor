@@ -240,6 +240,15 @@ void EditorWindow::createMenus()
         EditorTab::setSpellCheckingEnabled(enabled);
         forEachTab([](EditorTab* tab) { tab->updateSpellChecking(); });
     });
+    auto* correct = m_toolsMenu->addAction(tr("Correct Spelling While &Typing"));
+    correct->setCheckable(true);
+    correct->setChecked(EditorTab::correctWhileTyping());
+    correct->setToolTip(tr("A misspelled word with a single correction is corrected when a space or "
+                           "punctuation is typed after it; Ctrl+Z brings back the word as typed"));
+    connect(correct, &QAction::toggled, this, [this](bool on) {
+        EditorTab::setCorrectWhileTyping(on);
+        forEachTab([](EditorTab* tab) { tab->updateSpellChecking(); });
+    });
     // The selection's misspelled words, or the whole text's, to confirm their corrections.
     addAction(m_toolsMenu, tr("&Review Spelling..."), QKeySequence(Qt::Key_F7), [this]() {
         if (auto* tab = currentTab()) tab->reviewSpelling();

@@ -28,13 +28,14 @@ endif()
 # 1.21: corrections of a space missing or misplaced (phraseCorrections)
 # 1.22: suggestions ranked by word frequency, qcodeedit-spelldata downloads the lists
 # 1.23: misspelledWords(), replaceWords() for Tools > Review Spelling
+# 1.24: correction while typing (setCorrectWhileTyping)
 foreach(package qcodeedit qcodeedit-kate qcodeedit-katedata qcodeedit-encoding qcodeedit-spell qcodeedit-spelldata qcodeedit-diff)
     string(REPLACE "qcodeedit-" "" component ${package})
     if(package STREQUAL "qcodeedit")
         set(component qcodeedit)
     endif()
     if(NOT TARGET qcodeedit::${component})
-        find_package(${package} 1.23.0 REQUIRED)
+        find_package(${package} 1.24.0 REQUIRED)
     endif()
 endforeach()
 

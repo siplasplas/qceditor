@@ -152,6 +152,11 @@ or of the whole text, with a correction for each, their line and context: words
 with a single correction are checked already, the others are checked by hand
 (picking another correction checks the word too). **Correct** replaces the
 checked words, all of them one undo step; nothing changes without it.
+**Tools > Correct Spelling While Typing** (off by default, remembered) corrects
+a misspelled word with a single correction as soon as a space or punctuation is
+typed after it ("tlyko " becomes "tylko "); the status bar says so, and Ctrl+Z
+brings back the word as typed. Pasted text and words right in another installed
+language are left alone.
 The language is the detected one; **Spelling Language** in the context menu
 chooses another for the document, from the recently used ones, up to two at
 once (e.g. English + Polish), or **More…** for every dictionary hunspell has
