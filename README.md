@@ -148,9 +148,11 @@ programs); after a Yes the lists of other languages are downloaded when first
 needed, without asking. **Tools > Download Word Frequencies for Spelling**
 turns this on or off. Without the lists suggestions work as before.
 **Tools > Review Spelling** (F7) lists the misspelled words of the selection,
-or of the whole text, with a correction for each, their line and context: words
-with a single correction are checked already, the others are checked by hand
-(picking another correction checks the word too). **Correct** replaces the
+or of the whole text, with a correction for each, their line and context.
+**Checked at first** chooses which words are checked when it opens: those with a
+single correction, or every word with its first correction (remembered); the
+others are checked by hand (picking another correction checks the word too).
+**Show only checked words** hides the rest, to look over what will change. **Correct** replaces the
 checked words, all of them one undo step; nothing changes without it.
 **Tools > Correct Spelling While Typing** (off by default, remembered) corrects
 a misspelled word with a single correction as soon as a space or punctuation is

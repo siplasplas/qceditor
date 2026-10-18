@@ -5,6 +5,8 @@
 #include <QString>
 #include <qce/spell/CodeEditSpelling.h>
 
+class QCheckBox;
+class QComboBox;
 class QLabel;
 class QTreeWidget;
 
@@ -25,10 +27,11 @@ struct SpellingReviewItem
 };
 
 /// The misspelled words of the text or the selection, each with a correction
-/// to choose: those with a single correction are checked already, the others
-/// wait for the user to check them (and maybe pick another correction). The
-/// checked ones are replaced together (CodeEditSpelling::replaceWords(), one
-/// undo step).
+/// to choose. Checked at first: the words with a single correction, or every
+/// word with its first correction (the choice is remembered); the user checks
+/// or unchecks the others (and may pick another correction), and can show
+/// only the checked words to look them over. The checked ones are replaced
+/// together (CodeEditSpelling::replaceWords(), one undo step).
 class SpellingReviewDialog : public QDialog
 {
     Q_OBJECT
@@ -40,10 +43,16 @@ public:
 
 private:
     void updateSummary();
+    /// Checks the words as the "Checked at first" choice says.
+    void checkAtFirst();
+    /// Hides the unchecked words when "Only checked" is on.
+    void filter();
 
     QList<SpellingReviewItem> m_items;
     QTreeWidget* m_list = nullptr;
     QLabel* m_summary = nullptr;
+    QComboBox* m_checkAtFirst = nullptr;
+    QCheckBox* m_onlyChecked = nullptr;
 };
 
 } // namespace qceditor

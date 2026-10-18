@@ -1,7 +1,11 @@
 #include "SpellingReviewDialog.h"
 
+#include <qceditor/Settings.h>
+
+#include <QCheckBox>
 #include <QComboBox>
 #include <QDialogButtonBox>
+#include <QHBoxLayout>
 #include <QHeaderView>
 #include <QLabel>
 #include <QPushButton>
@@ -13,6 +17,9 @@ namespace qceditor {
 namespace {
 
 enum Column { WordColumn, CorrectionColumn, LineColumn, ContextColumn };
+
+// Whether every word is checked at first, not only those with a single correction.
+const char* kCheckAllKey = "spelling/reviewChecksEveryWord";
 
 // The line around the word, shortened at both ends.
 QString context(const QString& line, int start, int end)
@@ -35,13 +42,24 @@ SpellingReviewDialog::SpellingReviewDialog(const QList<SpellingReviewItem>& item
     setWindowTitle(tr("Review Spelling"));
     resize(760, 480);
     auto* layout = new QVBoxLayout(this);
-    auto* intro = new QLabel(inSelection
-        ? tr("Misspelled words in the selection. Checked ones are corrected; those with a single "
-             "correction are checked already, check others to correct them too.")
-        : tr("Misspelled words in the text. Checked ones are corrected; those with a single "
-             "correction are checked already, check others to correct them too."), this);
+    auto* intro = new QLabel(inSelection ? tr("Misspelled words in the selection. The checked ones are corrected.")
+                                         : tr("Misspelled words in the text. The checked ones are corrected."),
+                             this);
     intro->setWordWrap(true);
     layout->addWidget(intro);
+
+    auto* options = new QHBoxLayout;
+    options->addWidget(new QLabel(tr("Checked at first:"), this));
+    m_checkAtFirst = new QComboBox(this);
+    m_checkAtFirst->addItem(tr("Words with a single correction"));
+    m_checkAtFirst->addItem(tr("Every word, with its first correction"));
+    m_checkAtFirst->setCurrentIndex(settings().value(kCheckAllKey, false).toBool() ? 1 : 0);
+    options->addWidget(m_checkAtFirst);
+    options->addStretch();
+    m_onlyChecked = new QCheckBox(tr("Show &only checked words"), this);
+    m_onlyChecked->setToolTip(tr("Hides the unchecked words, to look over the corrections that will be made"));
+    options->addWidget(m_onlyChecked);
+    layout->addLayout(options);
 
     m_list = new QTreeWidget(this);
     m_list->setRootIsDecorated(false);
@@ -63,7 +81,7 @@ SpellingReviewDialog::SpellingReviewDialog(const QList<SpellingReviewItem>& item
             continue;
         }
         row->setFlags(row->flags() | Qt::ItemIsUserCheckable);
-        row->setCheckState(WordColumn, item.choices.size() == 1 ? Qt::Checked : Qt::Unchecked);
+        row->setCheckState(WordColumn, Qt::Unchecked);
         auto* choice = new QComboBox(m_list);
         for (const auto& correction : item.choices) choice->addItem(correction.replacement);
         // Picking a correction means correcting the word.
@@ -73,8 +91,17 @@ SpellingReviewDialog::SpellingReviewDialog(const QList<SpellingReviewItem>& item
     m_list->resizeColumnToContents(WordColumn);
     m_list->setColumnWidth(CorrectionColumn, qMax(160, m_list->columnWidth(WordColumn) + 40));
     m_list->resizeColumnToContents(LineColumn);
-    connect(m_list, &QTreeWidget::itemChanged, this, &SpellingReviewDialog::updateSummary);
     layout->addWidget(m_list, 1);
+    checkAtFirst();
+    connect(m_list, &QTreeWidget::itemChanged, this, &SpellingReviewDialog::updateSummary);
+    connect(m_checkAtFirst, &QComboBox::activated, this, [this](int index) {
+        settings().setValue(kCheckAllKey, index == 1);
+        checkAtFirst();
+        filter();
+    });
+    // Applied when switched: a word unchecked while looking them over stays
+    // in sight until then.
+    connect(m_onlyChecked, &QCheckBox::toggled, this, &SpellingReviewDialog::filter);
 
     m_summary = new QLabel(this);
     layout->addWidget(m_summary);
@@ -110,6 +137,28 @@ QList<QPair<SpellingReviewItem::Range, QString>> SpellingReviewDialog::chosenRep
         result.append({item.choices[index].range, item.choices[index].replacement});
     }
     return result;
+}
+
+void SpellingReviewDialog::checkAtFirst()
+{
+    const bool every = m_checkAtFirst->currentIndex() == 1;
+    for (int i = 0; i < m_list->topLevelItemCount(); ++i) {
+        QTreeWidgetItem* row = m_list->topLevelItem(i);
+        if (!(row->flags() & Qt::ItemIsUserCheckable)) continue;
+        const SpellingReviewItem& item = m_items[row->data(WordColumn, Qt::UserRole).toInt()];
+        row->setCheckState(WordColumn, every || item.choices.size() == 1 ? Qt::Checked : Qt::Unchecked);
+        if (auto* choice = qobject_cast<QComboBox*>(m_list->itemWidget(row, CorrectionColumn)))
+            choice->setCurrentIndex(0);
+    }
+}
+
+void SpellingReviewDialog::filter()
+{
+    const bool only = m_onlyChecked->isChecked();
+    for (int i = 0; i < m_list->topLevelItemCount(); ++i) {
+        QTreeWidgetItem* row = m_list->topLevelItem(i);
+        row->setHidden(only && row->checkState(WordColumn) != Qt::Checked);
+    }
 }
 
 void SpellingReviewDialog::updateSummary()
