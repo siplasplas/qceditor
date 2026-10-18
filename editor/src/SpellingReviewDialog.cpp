@@ -51,7 +51,7 @@ SpellingReviewDialog::SpellingReviewDialog(const QList<SpellingReviewItem>& item
     auto* options = new QHBoxLayout;
     options->addWidget(new QLabel(tr("Checked at first:"), this));
     m_checkAtFirst = new QComboBox(this);
-    m_checkAtFirst->addItem(tr("Words with a single correction"));
+    m_checkAtFirst->addItem(tr("Sure corrections only"));
     m_checkAtFirst->addItem(tr("Every word, with its first correction"));
     m_checkAtFirst->setCurrentIndex(settings().value(kCheckAllKey, false).toBool() ? 1 : 0);
     options->addWidget(m_checkAtFirst);
@@ -83,7 +83,7 @@ SpellingReviewDialog::SpellingReviewDialog(const QList<SpellingReviewItem>& item
         row->setFlags(row->flags() | Qt::ItemIsUserCheckable);
         row->setCheckState(WordColumn, Qt::Unchecked);
         auto* choice = new QComboBox(m_list);
-        for (const auto& correction : item.choices) choice->addItem(correction.replacement);
+        for (const auto& correction : item.choices) choice->addItem(correction.label);
         // Picking a correction means correcting the word.
         connect(choice, &QComboBox::activated, this, [row]() { row->setCheckState(WordColumn, Qt::Checked); });
         m_list->setItemWidget(row, CorrectionColumn, choice);
@@ -146,7 +146,7 @@ void SpellingReviewDialog::checkAtFirst()
         QTreeWidgetItem* row = m_list->topLevelItem(i);
         if (!(row->flags() & Qt::ItemIsUserCheckable)) continue;
         const SpellingReviewItem& item = m_items[row->data(WordColumn, Qt::UserRole).toInt()];
-        row->setCheckState(WordColumn, every || item.choices.size() == 1 ? Qt::Checked : Qt::Unchecked);
+        row->setCheckState(WordColumn, every || item.confident ? Qt::Checked : Qt::Unchecked);
         if (auto* choice = qobject_cast<QComboBox*>(m_list->itemWidget(row, CorrectionColumn)))
             choice->setCurrentIndex(0);
     }

@@ -192,6 +192,7 @@ private:
     /// Suggestions, Add to Dictionary and Ignore for the misspelled word at
     /// `position`; false when there is none.
     bool addSpellingCorrections(QMenu& menu, qce::TextCursor position);
+    static QString spaceCorrectionText(const QString& typed, const QString& replacement);
     void updateDiskStamp();
     void onDocumentChanged();
     void showContextMenu(const QPoint& position);

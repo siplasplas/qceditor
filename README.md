@@ -135,10 +135,10 @@ Dictionary** (a user dictionary shared with other siplasplas programs,
 `~/.local/share/siplasplas/spell/`) and **Ignore** (this document, this session).
 Alt+Enter opens the same choices for the misspelled word at the cursor, below
 it, to pick with the keyboard. Usually there is one suggestion, three at most:
-only those nearly as good as the best are offered (qcodeedit 1.20). A space
-missing or typed in the wrong place comes first: for "n aoknie" the menu on
-"aoknie" offers "na oknie", for "mam yz" it offers "mamy z", replacing both
-words.
+only those nearly as good as the best are offered, and none when every
+dictionary word is far off. A space typed one letter off is offered after them,
+with both words: for "n aoknie" the menu on "aoknie" offers "n aoknie → na
+oknie", for "mam yz" it offers "mam yz → mamy z", replacing both words.
 Common words come before rare ones ("dialac": działać, not dialach) once the
 list of the most frequent words of the language is there. The first time a
 dictionary without one is used, the editor asks whether to download it
@@ -149,14 +149,15 @@ needed, without asking. **Tools > Download Word Frequencies for Spelling**
 turns this on or off. Without the lists suggestions work as before.
 **Tools > Review Spelling** (F7) lists the misspelled words of the selection,
 or of the whole text, with a correction for each, their line and context.
-**Checked at first** chooses which words are checked when it opens: those with a
-single correction, or every word with its first correction (remembered); the
+**Checked at first** chooses which words are checked when it opens: the sure
+corrections only (a single suggestion close to the word, e.g. "bhyc" → być, not
+"agents" → agent), or every word with its first correction (remembered); the
 others are checked by hand (picking another correction checks the word too).
 **Show only checked words** hides the rest, to look over what will change. **Correct** replaces the
 checked words, all of them one undo step; nothing changes without it.
 **Tools > Correct Spelling While Typing** (off by default, remembered) corrects
-a misspelled word with a single correction as soon as a space or punctuation is
-typed after it ("tlyko " becomes "tylko "); the status bar says so, and Ctrl+Z
+a misspelled word with a sure correction as soon as a space or punctuation is
+typed after it ("bhyc " becomes "być "); the status bar says so, and Ctrl+Z
 brings back the word as typed. Pasted text and words right in another installed
 language are left alone.
 The language is the detected one; **Spelling Language** in the context menu

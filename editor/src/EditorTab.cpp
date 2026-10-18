@@ -672,27 +672,33 @@ void EditorTab::applySpellLanguages()
                      .arg(name.isEmpty() ? languages.front() : name, qce::spell::packageHint(languages.front())));
 }
 
+// "da sie → d asie": a moved space with the words it changes.
+QString EditorTab::spaceCorrectionText(const QString& typed, const QString& replacement)
+{
+    return QStringLiteral("%1 → %2").arg(typed, replacement).replace("&", "&&");
+}
+
 bool EditorTab::addSpellingCorrections(QMenu& menu, qce::TextCursor position)
 {
     if (!m_spelling->isEnabled()) return false;
     const auto word = m_spelling->misspelledWordAt(position);
     if (!word) return false;
-    // A space missing or misplaced first: two right words are a strong hint
-    // ("n aoknie" → "na oknie").
-    const auto phrases = m_spelling->phraseCorrections(*word);
-    for (const auto& phrase : phrases) {
-        auto* action = menu.addAction(QString(phrase.replacement).replace("&", "&&"));
-        connect(action, &QAction::triggered, this, [this, phrase]() {
-            m_spelling->replaceWord(phrase.range, phrase.replacement);
-        });
-    }
     const QStringList suggestions = m_spelling->suggestions(word->word, 8);
+    const auto phrases = m_spelling->phraseCorrections(*word);
     if (suggestions.isEmpty() && phrases.isEmpty())
         menu.addAction(tr("No suggestions"))->setEnabled(false);
     for (const QString& suggestion : suggestions) {
         auto* action = menu.addAction(QString(suggestion).replace("&", "&&"));
         connect(action, &QAction::triggered, this, [this, w = *word, suggestion]() {
             m_spelling->replaceWord(w, suggestion);
+        });
+    }
+    // A space one letter off after the word's own suggestions, shown with
+    // both words so that it is not taken for a correction of this word alone.
+    for (const auto& phrase : phrases) {
+        auto* action = menu.addAction(spaceCorrectionText(phrase.range.word, phrase.replacement));
+        connect(action, &QAction::triggered, this, [this, phrase]() {
+            m_spelling->replaceWord(phrase.range, phrase.replacement);
         });
     }
     menu.addSeparator();
@@ -742,18 +748,23 @@ void EditorTab::reviewSpelling()
     QProgressDialog progress(tr("Looking for corrections…"), tr("Cancel"), 0, int(words.size()), this);
     progress.setWindowModality(Qt::WindowModal);
     progress.setMinimumDuration(500);
-    QHash<QString, QStringList> suggestions;
+    QHash<QString, QList<qce::spell::SpellChecker::Suggestion>> suggestions;
     QList<SpellingReviewItem> items;
     for (int i = 0; i < words.size(); ++i) {
         progress.setValue(i);
         if (progress.wasCanceled()) return;
         const auto& word = words[i];
-        SpellingReviewItem item{word, m_doc->lineAt(word.start.line), {}};
-        for (const auto& phrase : m_spelling->phraseCorrections(word))
-            item.choices.append({phrase.range, phrase.replacement});
+        SpellingReviewItem item{word, m_doc->lineAt(word.start.line), {}, false};
         auto found = suggestions.find(word.word);
-        if (found == suggestions.end()) found = suggestions.insert(word.word, m_spelling->suggestions(word.word, 3));
-        for (const QString& suggestion : found.value()) item.choices.append({word, suggestion});
+        if (found == suggestions.end())
+            found = suggestions.insert(word.word, m_spelling->scoredSuggestions(word.word, 3));
+        for (const auto& suggestion : found.value()) item.choices.append({word, suggestion.text, suggestion.text});
+        const auto phrases = m_spelling->phraseCorrections(word);
+        for (const auto& phrase : phrases)
+            item.choices.append({phrase.range, phrase.replacement,
+                                 spaceCorrectionText(phrase.range.word, phrase.replacement)});
+        // Sure: a single close suggestion and no moved space instead.
+        item.confident = phrases.isEmpty() && qce::spell::SpellChecker::isConfident(word.word, found.value());
         items.append(item);
     }
     progress.setValue(int(words.size()));
