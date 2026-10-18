@@ -34,10 +34,8 @@
 #include <QGuiApplication>
 #include <QShortcut>
 #include "EenFile.h"
-#include "SpellingReviewDialog.h"
+#include <qce/spell/SpellingReview.h>
 #include <QHash>
-#include <QElapsedTimer>
-#include <QProgressDialog>
 #include <algorithm>
 #include <functional>
 #include <qce/CodeEditArea.h>
@@ -612,6 +610,7 @@ static const char* kSpellingEnabledKey = "spelling/enabled";
 static const char* kRecentSpellingKey = "spelling/recentDictionaries";
 static const char* kCorrectWhileTypingKey = "spelling/correctWhileTyping";
 static const char* kHunspellSuggestionsKey = "spelling/hunspellSuggestions";
+static const char* kReviewCheckedAtFirstKey = "spelling/reviewCheckedAtFirst";
 static constexpr int kRecentSpellingCount = 6;
 
 bool EditorTab::spellCheckingEnabled()
@@ -743,59 +742,11 @@ void EditorTab::showSpellingCorrections()
 
 void EditorTab::reviewSpelling()
 {
-    auto* area = m_edit->area();
-    if (area->readOnly()) return;
-    if (!m_spelling->isEnabled() || !m_spelling->isReady()) {
-        emit message(tr("Spell checking is off or has no dictionary for this text"));
-        return;
-    }
-    const bool inSelection = area->hasSelection();
-    const int lastLine = m_doc->lineCount() - 1;
-    const qce::TextCursor from = inSelection ? area->selectionStart() : qce::TextCursor{0, 0};
-    const qce::TextCursor to = inSelection ? area->selectionEnd()
-                                           : qce::TextCursor{lastLine, int(m_doc->lineAt(lastLine).size())};
-    const auto words = m_spelling->misspelledWords(from, to);
-    if (words.isEmpty()) {
-        QMessageBox::information(this, tr("Review Spelling"),
-                                 inSelection ? tr("No misspelled words in the selection.")
-                                             : tr("No misspelled words."));
-        return;
-    }
-    // Suggestions take tens of milliseconds a word: once per distinct word,
-    // with progress for long texts.
-    QProgressDialog progress(tr("Looking for corrections…"), tr("Cancel"), 0, int(words.size()), this);
-    progress.setWindowModality(Qt::WindowModal);
-    progress.setMinimumDuration(500);
-    QElapsedTimer searching;
-    searching.start();
-    QHash<QString, QList<qce::spell::SpellChecker::Suggestion>> suggestions;
-    QList<SpellingReviewItem> items;
-    for (int i = 0; i < words.size(); ++i) {
-        progress.setValue(i);
-        if (progress.wasCanceled()) return;
-        const auto& word = words[i];
-        SpellingReviewItem item{word, m_doc->lineAt(word.start.line), {}, false, false};
-        auto found = suggestions.find(word.word);
-        if (found == suggestions.end())
-            found = suggestions.insert(word.word, m_spelling->scoredSuggestions(word.word, 3));
-        for (const auto& suggestion : found.value()) item.choices.append({word, suggestion.text, suggestion.text});
-        const auto phrases = m_spelling->phraseCorrections(word);
-        for (const auto& phrase : phrases)
-            item.choices.append({phrase.range, phrase.replacement,
-                                 spaceCorrectionText(phrase.range.word, phrase.replacement)});
-        // Single: one suggestion and no moved space instead; sure: and close.
-        item.single = phrases.isEmpty() && found.value().size() == 1;
-        item.confident = item.single && qce::spell::SpellChecker::isConfident(word.word, found.value());
-        items.append(item);
-    }
-    progress.setValue(int(words.size()));
-    SpellingReviewDialog dialog(items, inSelection, this);
-    dialog.setSearchTime(searching.elapsed());
-    if (dialog.exec() != QDialog::Accepted) return;
-    const auto chosen = dialog.chosenReplacements();
-    if (chosen.isEmpty()) return;
-    m_spelling->replaceWords(chosen);
-    emit message(tr("%n word(s) corrected; Ctrl+Z undoes it", nullptr, int(chosen.size())));
+    // What the window checks at first is the program's setting.
+    auto checkedAtFirst = qce::spell::checkedAtFirstFromName(settings().value(kReviewCheckedAtFirstKey).toString());
+    const int corrected = qce::spell::reviewSpelling(*m_spelling, checkedAtFirst, this);
+    settings().setValue(kReviewCheckedAtFirstKey, qce::spell::checkedAtFirstName(checkedAtFirst));
+    if (corrected > 0) emit message(tr("%n word(s) corrected; Ctrl+Z undoes it", nullptr, corrected));
 }
 
 void EditorTab::addSpellingMenu(QMenu& menu, const QPoint& position)

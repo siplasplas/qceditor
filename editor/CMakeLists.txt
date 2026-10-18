@@ -20,8 +20,6 @@ add_library(qceditor-editor STATIC
     src/FindBar.cpp
     src/EncodingChoiceDialog.cpp
     src/SpellLanguageDialog.cpp
-    src/SpellingReviewDialog.cpp
-    src/SpellingReviewDialog.h
     src/SyntaxData.cpp
     src/Settings.cpp
     src/ReplaceCommand.h
