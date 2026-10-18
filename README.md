@@ -155,7 +155,9 @@ corrections only (a single suggestion close to the word, e.g. "bhyc" → być, n
 word with its first correction (remembered); the
 others are checked by hand (picking another correction checks the word too).
 **Show** lists all words, only the checked ones (to look over what will change)
-or only the unchecked ones (left to decide). The
+or only the unchecked ones (left to decide); Ctrl+C or the context menu copies
+the selected rows (word, correction, score, line and the whole line of text,
+separated by tabs) or only their lines of text. The
 window says how long finding the corrections took (seconds, and milliseconds a
 word). **Add to Dictionary** and **Ignore** take the selected word out of the
 list, every row of it (an English or coined word written on purpose).
