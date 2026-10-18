@@ -154,7 +154,8 @@ corrections only (a single suggestion close to the word, e.g. "bhyc" → być, n
 "agents" → agent), the words with a single suggestion, close or not, or every
 word with its first correction (remembered); the
 others are checked by hand (picking another correction checks the word too).
-**Show only checked words** hides the rest, to look over what will change. The
+**Show** lists all words, only the checked ones (to look over what will change)
+or only the unchecked ones (left to decide). The
 window says how long finding the corrections took (seconds, and milliseconds a
 word). **Add to Dictionary** and **Ignore** take the selected word out of the
 list, every row of it (an English or coined word written on purpose).
