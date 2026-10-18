@@ -252,6 +252,10 @@ void EditorWindow::createMenus()
         forEachTab([](EditorTab* tab) { tab->updateSpellChecking(); });
     });
     m_toolsMenu->addAction(tr("Default Spelling &Language..."), this, &EditorWindow::chooseDefaultSpellLanguage);
+    m_toolsMenu->addAction(tr("User &Dictionary..."), this, [this]() {
+        if (auto* tab = currentTab()) tab->showUserDictionary();
+        forEachTab([](EditorTab* tab) { tab->recheckSpelling(); });
+    });
     // The selection's misspelled words, or the whole text's, to confirm their corrections.
     addAction(m_toolsMenu, tr("&Review Spelling..."), QKeySequence(Qt::Key_F7), [this]() {
         if (auto* tab = currentTab()) tab->reviewSpelling();

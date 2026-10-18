@@ -33,13 +33,14 @@ endif()
 # 1.27: setHunspellSuggestions(); 1.28: the Review Spelling window (qce/spell/SpellingReview.h)
 # 1.29: hunspell only when none found by default, Add to Dictionary in the review
 # 1.30: the score column and sorting in the review
+# 1.35: the user's own corrections, UserDictionaryDialog
 foreach(package qcodeedit qcodeedit-kate qcodeedit-katedata qcodeedit-encoding qcodeedit-spell qcodeedit-spelldata qcodeedit-diff)
     string(REPLACE "qcodeedit-" "" component ${package})
     if(package STREQUAL "qcodeedit")
         set(component qcodeedit)
     endif()
     if(NOT TARGET qcodeedit::${component})
-        find_package(${package} 1.30.0 REQUIRED)
+        find_package(${package} 1.35.0 REQUIRED)
     endif()
 endforeach()
 

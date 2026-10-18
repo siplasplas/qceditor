@@ -162,7 +162,12 @@ the selected rows (word, correction, score, line and the whole line of text,
 separated by tabs) or only their lines of text. The
 window says how long finding the corrections took (seconds, and milliseconds a
 word). **Add to Dictionary** and **Ignore** take the selected word out of the
-list, every row of it (an English or coined word written on purpose).
+list, every row of it (an English or coined word written on purpose);
+**Remember Correction** keeps the selected word's chosen correction as your own
+(e.g. "Paypal" → PayPal): from then on it is that word's only suggestion, with
+score 0, so sure, also while typing. **Tools > User Dictionary** (also in the
+window) lists your words and corrections, shared with other programs, to remove
+those no longer wanted.
 **Correct** replaces the checked words, all of them one undo step; nothing
 changes without it.
 **Tools > Correct Spelling While Typing** (off by default, remembered) corrects

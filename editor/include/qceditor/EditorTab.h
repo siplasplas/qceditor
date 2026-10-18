@@ -143,6 +143,11 @@ public:
     /// to confirm their corrections, applied as one undo step (Tools > Review
     /// Spelling).
     void reviewSpelling();
+    /// The user's own words and corrections, to look over or remove (Tools >
+    /// User Dictionary); recheck the tabs afterwards.
+    void showUserDictionary();
+    /// Checks the visible text again (e.g. after the user dictionary changed).
+    void recheckSpelling();
     /// Spelling dictionaries chosen for this document (e.g. en_US, pl_PL);
     /// empty = the detected language.
     void setSpellLanguages(const QStringList& dictionaries);

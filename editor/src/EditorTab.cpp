@@ -35,6 +35,7 @@
 #include <QShortcut>
 #include "EenFile.h"
 #include <qce/spell/SpellingReview.h>
+#include <qce/spell/UserDictionaryDialog.h>
 #include <QHash>
 #include <algorithm>
 #include <functional>
@@ -735,6 +736,16 @@ void EditorTab::showSpellingCorrections()
     }
     const QRect caret = area->inputMethodQuery(Qt::ImCursorRectangle).toRect();
     menu.exec(area->mapToGlobal(caret.bottomLeft()));
+}
+
+void EditorTab::showUserDictionary()
+{
+    qce::spell::UserDictionaryDialog(m_spelling->checker(), this).exec();
+}
+
+void EditorTab::recheckSpelling()
+{
+    m_spelling->recheck();
 }
 
 void EditorTab::reviewSpelling()
