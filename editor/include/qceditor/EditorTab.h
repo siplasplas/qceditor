@@ -129,6 +129,10 @@ public:
     /// The corrections of the misspelled word at the cursor in a menu below
     /// it, to choose with the keyboard (Alt+Enter).
     void showSpellingCorrections();
+    /// The misspelled words of the selection (or the whole text) in a window
+    /// to confirm their corrections, applied as one undo step (Tools > Review
+    /// Spelling).
+    void reviewSpelling();
     /// Spelling dictionaries chosen for this document (e.g. en_US, pl_PL);
     /// empty = the detected language.
     void setSpellLanguages(const QStringList& dictionaries);

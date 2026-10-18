@@ -240,6 +240,10 @@ void EditorWindow::createMenus()
         EditorTab::setSpellCheckingEnabled(enabled);
         forEachTab([](EditorTab* tab) { tab->updateSpellChecking(); });
     });
+    // The selection's misspelled words, or the whole text's, to confirm their corrections.
+    addAction(m_toolsMenu, tr("&Review Spelling..."), QKeySequence(Qt::Key_F7), [this]() {
+        if (auto* tab = currentTab()) tab->reviewSpelling();
+    });
     // Common words before rare ones in the suggestions; the list of a
     // language is fetched when a dictionary of it is first used.
     m_wordFrequencies = m_toolsMenu->addAction(tr("Download &Word Frequencies for Spelling"));

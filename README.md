@@ -147,6 +147,11 @@ from GitHub, into `~/.local/share/word-frequencies`, shared with other
 programs); after a Yes the lists of other languages are downloaded when first
 needed, without asking. **Tools > Download Word Frequencies for Spelling**
 turns this on or off. Without the lists suggestions work as before.
+**Tools > Review Spelling** (F7) lists the misspelled words of the selection,
+or of the whole text, with a correction for each, their line and context: words
+with a single correction are checked already, the others are checked by hand
+(picking another correction checks the word too). **Correct** replaces the
+checked words, all of them one undo step; nothing changes without it.
 The language is the detected one; **Spelling Language** in the context menu
 chooses another for the document, from the recently used ones, up to two at
 once (e.g. English + Polish), or **More…** for every dictionary hunspell has

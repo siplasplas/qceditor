@@ -34,6 +34,9 @@
 #include <QGuiApplication>
 #include <QShortcut>
 #include "EenFile.h"
+#include "SpellingReviewDialog.h"
+#include <QHash>
+#include <QProgressDialog>
 #include <algorithm>
 #include <functional>
 #include <qce/CodeEditArea.h>
@@ -695,6 +698,54 @@ void EditorTab::showSpellingCorrections()
     }
     const QRect caret = area->inputMethodQuery(Qt::ImCursorRectangle).toRect();
     menu.exec(area->mapToGlobal(caret.bottomLeft()));
+}
+
+void EditorTab::reviewSpelling()
+{
+    auto* area = m_edit->area();
+    if (area->readOnly()) return;
+    if (!m_spelling->isEnabled() || !m_spelling->isReady()) {
+        emit message(tr("Spell checking is off or has no dictionary for this text"));
+        return;
+    }
+    const bool inSelection = area->hasSelection();
+    const int lastLine = m_doc->lineCount() - 1;
+    const qce::TextCursor from = inSelection ? area->selectionStart() : qce::TextCursor{0, 0};
+    const qce::TextCursor to = inSelection ? area->selectionEnd()
+                                           : qce::TextCursor{lastLine, int(m_doc->lineAt(lastLine).size())};
+    const auto words = m_spelling->misspelledWords(from, to);
+    if (words.isEmpty()) {
+        QMessageBox::information(this, tr("Review Spelling"),
+                                 inSelection ? tr("No misspelled words in the selection.")
+                                             : tr("No misspelled words."));
+        return;
+    }
+    // Suggestions take tens of milliseconds a word: once per distinct word,
+    // with progress for long texts.
+    QProgressDialog progress(tr("Looking for corrections…"), tr("Cancel"), 0, int(words.size()), this);
+    progress.setWindowModality(Qt::WindowModal);
+    progress.setMinimumDuration(500);
+    QHash<QString, QStringList> suggestions;
+    QList<SpellingReviewItem> items;
+    for (int i = 0; i < words.size(); ++i) {
+        progress.setValue(i);
+        if (progress.wasCanceled()) return;
+        const auto& word = words[i];
+        SpellingReviewItem item{word, m_doc->lineAt(word.start.line), {}};
+        for (const auto& phrase : m_spelling->phraseCorrections(word))
+            item.choices.append({phrase.range, phrase.replacement});
+        auto found = suggestions.find(word.word);
+        if (found == suggestions.end()) found = suggestions.insert(word.word, m_spelling->suggestions(word.word, 3));
+        for (const QString& suggestion : found.value()) item.choices.append({word, suggestion});
+        items.append(item);
+    }
+    progress.setValue(int(words.size()));
+    SpellingReviewDialog dialog(items, inSelection, this);
+    if (dialog.exec() != QDialog::Accepted) return;
+    const auto chosen = dialog.chosenReplacements();
+    if (chosen.isEmpty()) return;
+    m_spelling->replaceWords(chosen);
+    emit message(tr("%n word(s) corrected; Ctrl+Z undoes it", nullptr, int(chosen.size())));
 }
 
 void EditorTab::addSpellingMenu(QMenu& menu, const QPoint& position)
