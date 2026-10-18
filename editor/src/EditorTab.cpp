@@ -650,8 +650,17 @@ bool EditorTab::addSpellingCorrections(QMenu& menu, qce::TextCursor position)
     if (!m_spelling->isEnabled()) return false;
     const auto word = m_spelling->misspelledWordAt(position);
     if (!word) return false;
+    // A space missing or misplaced first: two right words are a strong hint
+    // ("n aoknie" → "na oknie").
+    const auto phrases = m_spelling->phraseCorrections(*word);
+    for (const auto& phrase : phrases) {
+        auto* action = menu.addAction(QString(phrase.replacement).replace("&", "&&"));
+        connect(action, &QAction::triggered, this, [this, phrase]() {
+            m_spelling->replaceWord(phrase.range, phrase.replacement);
+        });
+    }
     const QStringList suggestions = m_spelling->suggestions(word->word, 8);
-    if (suggestions.isEmpty())
+    if (suggestions.isEmpty() && phrases.isEmpty())
         menu.addAction(tr("No suggestions"))->setEnabled(false);
     for (const QString& suggestion : suggestions) {
         auto* action = menu.addAction(QString(suggestion).replace("&", "&&"));
