@@ -157,8 +157,9 @@ corrections only (a single suggestion close to the word, e.g. "bhyc" → być, n
 "agents" → agent), the words with a single suggestion, close or not, or every
 word with its first correction (remembered), or only the words with several
 suggestions ("Several") or with several whose first one would be sure alone
-("Several, first close"), to look them over with **Show** set to the checked
-ones; the
+("Several, first close"), or only those without suggestions that you gave
+your own correction, to look them over with **Show** set to the checked ones
+(the words still without one are last when sorted by score); the
 others are checked by hand with their check boxes (picking a correction checks
 the word, also the one shown, only with **Picking a correction checks the
 word** on).
