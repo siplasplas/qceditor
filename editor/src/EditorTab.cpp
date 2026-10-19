@@ -117,7 +117,7 @@ EditorTab::EditorTab(QWidget* parent)
     layout->setContentsMargins(0, 0, 0, 0);
     layout->setSpacing(0);
     m_findBar = new FindBar(this);
-    layout->addWidget(m_findBar);
+    layout->addWidget(m_findBar->space());
 
     // Non-modal notice when the encoding was guessed without confidence: the
     // file is already open with the most likely one.

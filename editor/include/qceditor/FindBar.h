@@ -22,6 +22,9 @@ public:
     void showSearch();
     void showReplace();
     void findNext(bool backwards = false);
+    /// The space the tab's layout gives the bar while it pushes the lines down;
+    /// otherwise the bar covers the top of the editor.
+    QWidget* space() const { return m_space; }
 private:
     struct Match { int start; int end; QStringList captures; };
     bool eventFilter(QObject* watched, QEvent* event) override;
@@ -30,6 +33,9 @@ private:
     void rebuild(bool moveCursor = true);
     void updateHighlights();
     void activate(int index);
+    void reveal(int row);
+    void setCovering(bool covering);
+    void place();
     void closeSearch();
     void replaceCurrent();
     void replaceAll();
@@ -57,6 +63,9 @@ private:
     QToolButton* m_previous;
     QToolButton* m_next;
     QShortcut* m_escape = nullptr;
+    QWidget* m_space;
+    bool m_covering = false;
+    bool m_placing = false;
     QVector<Match> m_matches;
     QVector<int> m_lineStarts;
     int m_current = -1;

@@ -11,6 +11,7 @@
 #include <QLabel>
 #include <QToolButton>
 #include <QShortcut>
+#include <QScrollBar>
 #include <QRegularExpression>
 #include <QStyle>
 #include <QSignalBlocker>
@@ -22,7 +23,20 @@ namespace qceditor {
 FindBar::FindBar(EditorTab* tab) : QWidget(tab), m_tab(tab)
 {
     setObjectName("findBar");
+    // Not in the tab's layout: the bar lies over the top lines of the editor,
+    // or over m_space when it pushes them down (see reveal()).
+    setAutoFillBackground(true);
+    m_space = new QWidget(tab);
+    m_space->setObjectName("findBarSpace");
+    m_space->hide();
     tab->editor()->area()->installEventFilter(this);
+    tab->editor()->installEventFilter(this);
+    auto* scrollBar = tab->editor()->area()->verticalScrollBar();
+    connect(scrollBar, &QScrollBar::rangeChanged, this, &FindBar::place);
+    // Scrolled by hand: the first lines are shown below the bar, the others under it.
+    connect(scrollBar, &QScrollBar::valueChanged, this, [this](int value) {
+        if (!m_placing && !isHidden()) setCovering(value > 0);
+    });
     auto* rows = new QVBoxLayout(this);
     rows->setContentsMargins(8, 6, 8, 6);
     rows->setSpacing(4);
@@ -48,7 +62,7 @@ FindBar::FindBar(EditorTab* tab) : QWidget(tab), m_tab(tab)
     m_query = new QLineEdit(field);
     m_query->setObjectName("findQuery");
     m_query->setFrame(false); m_query->setClearButtonEnabled(true);
-    m_query->setPlaceholderText(tr("Find"));
+    m_query->setPlaceholderText(tr("Search"));
     fieldLayout->addWidget(m_query, 1);
     m_wrap = button(QString::fromUtf8("↩"), tr("Wrap around"), true); m_wrap->setChecked(true);
     m_case = button("Cc", tr("Match case"), true);
@@ -96,6 +110,8 @@ FindBar::FindBar(EditorTab* tab) : QWidget(tab), m_tab(tab)
     connect(m_expand, &QToolButton::toggled, this, [this](bool expanded) {
         m_replaceRow->setVisible(expanded);
         m_expand->setIcon(style()->standardIcon(expanded ? QStyle::SP_ArrowDown : QStyle::SP_ArrowRight));
+        place();
+        if (m_current >= 0) reveal(m_tab->editor()->area()->visualRow(positionFor(m_matches[m_current].start)));
     });
     connect(m_replace, &QPushButton::clicked, this, &FindBar::replaceCurrent);
     connect(m_replaceAll, &QPushButton::clicked, this, &FindBar::replaceAll);
@@ -143,11 +159,15 @@ void FindBar::showEvent(QShowEvent* event)
 {
     m_escape->setEnabled(true);
     QWidget::showEvent(event);
+    // Until a result says otherwise: pushed down at the top of the text, covering below it.
+    m_covering = m_tab->editor()->area()->verticalScrollBar()->value() > 0;
+    place();
 }
 
 void FindBar::hideEvent(QHideEvent* event)
 {
     m_escape->setEnabled(false);
+    m_space->hide();
     QWidget::hideEvent(event);
 }
 
@@ -155,14 +175,72 @@ bool FindBar::eventFilter(QObject* watched, QEvent* event)
 {
     if (watched == m_tab->editor()->area() && event->type() == QEvent::PaletteChange)
         updateHighlights();
+    if (watched == m_tab->editor() && (event->type() == QEvent::Resize || event->type() == QEvent::Move))
+        place();
     return QWidget::eventFilter(watched, event);
+}
+
+// Shows the bar over the top of the editor, or above it with the lines moved
+// down (m_space in the tab's layout).
+void FindBar::place()
+{
+    if (isHidden() || m_placing) return;
+    m_placing = true;
+    const int height = sizeHint().height();
+    m_space->setFixedHeight(height);
+    m_space->setVisible(!m_covering);
+    if (auto* layout = m_tab->layout()) layout->activate();
+    QRect rect = m_tab->editor()->geometry();
+    auto* scrollBar = m_tab->editor()->area()->verticalScrollBar();
+    if (m_covering) {
+        // The scroll bar stays usable beside the bar.
+        if (scrollBar->isVisible()) rect.setWidth(rect.width() - scrollBar->width());
+        rect.setHeight(height);
+    } else {
+        rect = QRect(rect.left(), m_space->y(), rect.width(), height);
+    }
+    setGeometry(rect);
+    raise();
+    m_placing = false;
+}
+
+void FindBar::setCovering(bool covering)
+{
+    if (m_covering == covering) return;
+    m_covering = covering;
+    place();
+}
+
+// The bar covers the top of the editor unless the row (visual, as the scroll
+// bar counts) is among the first rows of the text: then it moves them down.
+void FindBar::reveal(int row)
+{
+    auto* area = m_tab->editor()->area();
+    auto* scrollBar = area->verticalScrollBar();
+    const int lineHeight = area->viewportState().lineHeight;
+    const int viewportTop = area->viewport()->mapTo(m_tab->editor(), QPoint()).y();
+    const int covered = lineHeight <= 0 ? 0
+        : std::max(0, (sizeHint().height() - viewportTop + lineHeight - 1) / lineHeight);
+    const int first = scrollBar->value();
+    bool covering = true;
+    if (row >= first && row - first < covered) {
+        covering = row >= covered;
+        m_placing = true;
+        scrollBar->setValue(covering ? row - covered : 0);
+        m_placing = false;
+    }
+    setCovering(covering);
 }
 
 void FindBar::showSearch()
 {
     auto* area = m_tab->editor()->area();
     const auto selection = area->selectedText();
-    const bool wasHidden = isHidden();
+    // The selected text is searched for, unless it is the current result
+    // (selected by the search itself, maybe found by a pattern).
+    const bool selectedResult = !isHidden() && m_current >= 0
+        && offsetFor(area->selectionStart()) == m_matches[m_current].start
+        && offsetFor(area->selectionEnd()) == m_matches[m_current].end;
     // Capture the user's scope before navigation selects the first result.
     if (isHidden() && !m_scope->isChecked()) {
         m_scopeAvailable = area->hasSelection();
@@ -175,8 +253,10 @@ void FindBar::showSearch()
     if (area->readOnly()) m_expand->setChecked(false);
     m_expand->setVisible(!area->readOnly());
     show();
-    if (wasHidden && !selection.isEmpty() && !selection.contains('\n')) m_query->setText(selection);
-    rebuild(); m_query->setFocus(); m_query->selectAll();
+    if (!selectedResult && !selection.isEmpty() && !selection.contains('\n')) m_query->setText(selection);
+    rebuild();
+    if (m_current < 0) reveal(area->visualRow(area->cursorPosition()));
+    m_query->setFocus(); m_query->selectAll();
 }
 void FindBar::showReplace()
 {
@@ -255,6 +335,7 @@ void FindBar::activate(int index)
     const auto end = positionFor(match.end);
     m_tab->revealRange(start, end);
     area->setSelection(start, end);
+    reveal(area->visualRow(start));
     updateHighlights();
 }
 void FindBar::findNext(bool backwards)
