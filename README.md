@@ -158,13 +158,14 @@ corrections only (a single suggestion close to the word, e.g. "bhyc" → być, n
 word with its first correction (remembered), or only the words with several
 suggestions ("Several") or with several whose first one would be sure alone
 ("Several, first close"), or only those without suggestions that you gave
-your own correction, to look them over with **Show** set to the checked ones
-(the words still without one are last when sorted by score); the
+your own correction, to look them over with **Show** set to the checked ones;
+the
 others are checked by hand with their check boxes (picking a correction checks
 the word, also the one shown, only with **Picking a correction checks the
 word** on).
 **Show** lists all words, only the checked ones (to look over what will change)
-or only the unchecked ones (left to decide); Ctrl+C or the context menu copies
+or only the unchecked ones of the kind chosen in **Checked at first** (e.g.
+with "Words without suggestions": those still without your own correction); Ctrl+C or the context menu copies
 the selected rows (word, correction, score, line and the whole line of text,
 separated by tabs) or only their lines of text. The
 window says how long finding the corrections took (seconds, and milliseconds a
