@@ -60,6 +60,16 @@ public:
     /// at the end of a line.
     QString codePointAtCursor() const;
 
+    /// Size of a text as the file stores it: bytes in the file's encoding
+    /// (with its line breaks; the whole file also with BOM and final line
+    /// break), code points (not UTF-16 units; CRLF counts two) and lines.
+    struct Statistics { qint64 bytes = 0; qint64 codePoints = 0; int lines = 0; };
+    Statistics fileStatistics() const;
+    /// Of the selection; all zero without one.
+    Statistics selectionStatistics() const;
+    /// A window with the statistics of the file and of the selection, if any.
+    void showStatistics();
+
     /// Opens a file; the undo history starts anew. A path that does not exist
     /// yet gives an empty UTF-8 document saved under it. An encrypted .een
     /// file asks for its password (any text, taken as UTF-8); files of EdiQ

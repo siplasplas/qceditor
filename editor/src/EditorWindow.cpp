@@ -232,6 +232,10 @@ void EditorWindow::createMenus()
         if (auto* tab = currentTab()) tab->insertDateTime();
     });
     m_toolsMenu->addSeparator();
+    m_toolsMenu->addAction(tr("Stat&istics..."), this, [this]() {
+        if (auto* tab = currentTab()) tab->showStatistics();
+    });
+    m_toolsMenu->addSeparator();
     m_toolsMenu->addAction(tr("&Update Syntax Definitions"), this, &EditorWindow::updateSyntaxData);
     m_toolsMenu->addAction(tr("&Languages of Files Not in UTF-8..."), this, &EditorWindow::chooseLegacyLanguages);
     m_toolsMenu->addSeparator();

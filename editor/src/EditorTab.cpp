@@ -920,6 +920,67 @@ void EditorTab::chooseEncoding()
     reopenAsking(dialog.chosenEncoding());
 }
 
+namespace {
+
+// `text` has "\n" line breaks; those of `format` may be longer.
+EditorTab::Statistics textStatistics(const QString& text, const qce::encoding::FileFormat& format, int lines)
+{
+    EditorTab::Statistics statistics;
+    statistics.lines = lines;
+    statistics.bytes = qce::encoding::encode(text, format, true).bytes.size();
+    for (const QChar ch : text)
+        if (!ch.isLowSurrogate()) ++statistics.codePoints;
+    const int breaks = int(text.count(QLatin1Char('\n'))) + (format.finalNewline && !text.isEmpty() ? 1 : 0);
+    if (format.crlf && !format.cr) statistics.codePoints += breaks;
+    if (format.finalNewline && !text.isEmpty()) ++statistics.codePoints;
+    return statistics;
+}
+
+} // namespace
+
+EditorTab::Statistics EditorTab::fileStatistics() const
+{
+    const QString text = m_doc->toPlainText();
+    return textStatistics(text, fileFormat(), text.isEmpty() ? 0 : m_doc->lineCount());
+}
+
+EditorTab::Statistics EditorTab::selectionStatistics() const
+{
+    auto* area = m_edit->area();
+    if (!area->hasSelection()) return {};
+    qce::encoding::FileFormat format = fileFormat();
+    format.bom = false;
+    format.finalNewline = false;
+    const auto start = area->selectionStart(), end = area->selectionEnd();
+    // A selection ending at the start of a line does not take that line.
+    const int lines = end.line - start.line + (end.column > 0 || end.line == start.line ? 1 : 0);
+    return textStatistics(area->selectedText(), format, lines);
+}
+
+void EditorTab::showStatistics()
+{
+    const QLocale locale;
+    const auto file = fileStatistics();
+    const bool selection = m_edit->area()->hasSelection();
+    const auto selected = selectionStatistics();
+    auto row = [&](const QString& name, qint64 inFile, qint64 inSelection) {
+        QString html = QStringLiteral("<tr><td>%1</td><td align=right>&nbsp;&nbsp;%2</td>")
+            .arg(name, locale.toString(inFile));
+        if (selection) html += QStringLiteral("<td align=right>&nbsp;&nbsp;%1</td>").arg(locale.toString(inSelection));
+        return html + QStringLiteral("</tr>");
+    };
+    QString html = QStringLiteral("<table><tr><td></td><th align=right>%1</th>").arg(tr("File"));
+    if (selection) html += QStringLiteral("<th align=right>&nbsp;&nbsp;%1</th>").arg(tr("Selection"));
+    html += QStringLiteral("</tr>");
+    html += row(tr("Bytes (%1)").arg(encoding()), file.bytes, selected.bytes);
+    html += row(tr("Code points"), file.codePoints, selected.codePoints);
+    html += row(tr("Lines"), file.lines, selected.lines);
+    html += QStringLiteral("</table>");
+    QMessageBox box(QMessageBox::Information, tr("Statistics"), html, QMessageBox::Ok, this);
+    box.setTextFormat(Qt::RichText);
+    box.exec();
+}
+
 qce::encoding::FileFormat EditorTab::fileFormat() const
 {
     return m_encoding->format();

@@ -83,7 +83,11 @@ removal is one undo step: Ctrl+Z after saving brings the spaces back.
 **View > Wrap Lines** (on by default) and **View > Show Special Characters**
 apply to all tabs and are remembered. **Tools > Insert Date**, **Insert Time**
 and **Insert Both Date and Time** insert e.g. `Sunday 2026-10-18` and
-`16:21:05` at the cursor. **Help > About** shows the version and where the
+`16:21:05` at the cursor. **Tools > Statistics…** shows how many bytes the file
+takes in its encoding (with its line breaks, BOM and final line break, as saved),
+how many code points it has (whole Unicode characters, not UTF-16 units: an
+emoji is one, CRLF two) and how many lines; with a selection, the same for the
+selected text beside it. **Help > About** shows the version and where the
 syntax definitions are.
 
 The editor's context menu starts with the spelling corrections of the word
