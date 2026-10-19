@@ -163,9 +163,10 @@ the
 others are checked by hand with their check boxes (picking a correction checks
 the word, also the one shown, only with **Picking a correction checks the
 word** on).
-**Show** lists all words, only the checked ones (to look over what will change)
-or only the unchecked ones of the kind chosen in **Checked at first** (e.g.
-with "Words without suggestions": those still without your own correction); Ctrl+C or the context menu copies
+The list shows the words of the kind chosen in **Checked at first**: **Show**
+picks all of them, the checked ones (to look over what will change) or the
+unchecked ones (e.g. with "Words without suggestions": those still without
+your own correction), or **Every word**; Ctrl+C or the context menu copies
 the selected rows (word, correction, score, line and the whole line of text,
 separated by tabs) or only their lines of text. The
 window says how long finding the corrections took (seconds, and milliseconds a
