@@ -12,6 +12,7 @@
 #include <QToolButton>
 #include <QShortcut>
 #include <QScrollBar>
+#include <QToolTip>
 #include <QRegularExpression>
 #include <QStyle>
 #include <QSignalBlocker>
@@ -215,6 +216,7 @@ void FindBar::setCovering(bool covering)
 // bar counts) is among the first rows of the text: then it moves them down.
 void FindBar::reveal(int row)
 {
+    if (isHidden()) return;
     auto* area = m_tab->editor()->area();
     auto* scrollBar = area->verticalScrollBar();
     const int lineHeight = area->viewportState().lineHeight;
@@ -284,7 +286,7 @@ qce::TextCursor FindBar::positionFor(int offset) const
                          - m_lineStarts.begin()) - 1;
     return line < 0 ? qce::TextCursor{} : qce::TextCursor{line, offset - m_lineStarts[line]};
 }
-void FindBar::rebuild(bool moveCursor)
+void FindBar::rebuild(bool moveCursor, bool whileHidden)
 {
     if (m_replacing) return;
     m_matches.clear(); m_lineStarts.clear(); m_current = -1;
@@ -295,7 +297,7 @@ void FindBar::rebuild(bool moveCursor)
         m_lineStarts.append(offset); offset += m_tab->document()->lineAt(i).size() + 1;
     }
     m_query->setToolTip(QString());
-    if (!isHidden() && !m_query->text().isEmpty()) {
+    if ((!isHidden() || whileHidden) && !m_query->text().isEmpty()) {
         QString pattern = m_regex->isChecked() ? m_query->text() : QRegularExpression::escape(m_query->text());
         if (m_words->isChecked()) pattern = qce::words::wholeWordPattern(pattern);
         auto options = QRegularExpression::MultilineOption | QRegularExpression::UseUnicodePropertiesOption;
@@ -340,14 +342,35 @@ void FindBar::activate(int index)
 }
 void FindBar::findNext(bool backwards)
 {
-    if (isHidden()) { show(); rebuild(); m_query->setFocus(); return; }
-    if (m_matches.isEmpty()) return;
+    if (isHidden()) {
+        // F3 and Shift+F3 go to the next or previous result of the last query
+        // without showing the bar.
+        rebuild(false, true);
+        auto* area = m_tab->editor()->area();
+        const int from = offsetFor(backwards ? area->selectionStart() : area->selectionEnd());
+        const int after = int(std::lower_bound(m_matches.begin(), m_matches.end(), from,
+            [](const Match& match, int pos) { return match.start < pos; }) - m_matches.begin());
+        int next = backwards ? after - 1 : after;
+        if (!m_matches.isEmpty() && (next < 0 || next >= m_matches.size()) && m_wrap->isChecked())
+            next = backwards ? m_matches.size() - 1 : 0;
+        if (next < 0 || next >= m_matches.size()) { showNotFound(); return; }
+        activate(next);
+        return;
+    }
+    if (m_matches.isEmpty()) { showNotFound(); return; }
     int next = m_current + (backwards ? -1 : 1);
     if (next < 0 || next >= m_matches.size()) {
         if (!m_wrap->isChecked()) return;
         next = backwards ? m_matches.size() - 1 : 0;
     }
     activate(next);
+}
+void FindBar::showNotFound()
+{
+    auto* area = m_tab->editor()->area();
+    const QRect caret = area->inputMethodQuery(Qt::ImCursorRectangle).toRect();
+    QToolTip::showText(area->mapToGlobal(caret.bottomLeft()),
+                       tr("\"%1\" not found").arg(m_query->text()), area);
 }
 void FindBar::updateHighlights()
 {

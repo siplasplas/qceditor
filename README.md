@@ -223,6 +223,9 @@ selected occurrence is the current result, e.g. `5/23`; without a selection the
 previous query is selected whole, or the empty field shows the grey placeholder
 "Search". It shows the current/total match count, marks all matches and emphasizes
 the current one. Use the arrows, Enter/F3 or Shift+Enter/Shift+F3 to navigate.
+With the bar closed, F3 and Shift+F3 select the next or previous result of the
+last query without showing the bar. When nothing is found, a tooltip at the
+caret says so, e.g. `"abcd" not found` (`"" not found` without a query).
 Options include wrap around, case sensitivity, whole words, regular expressions
 and searching inside the current selection. Escape closes the bar. Each tab
 keeps its own query and search options; search does not modify document contents.

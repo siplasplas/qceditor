@@ -30,7 +30,8 @@ private:
     bool eventFilter(QObject* watched, QEvent* event) override;
     void showEvent(QShowEvent* event) override;
     void hideEvent(QHideEvent* event) override;
-    void rebuild(bool moveCursor = true);
+    void rebuild(bool moveCursor = true, bool whileHidden = false);
+    void showNotFound();
     void updateHighlights();
     void activate(int index);
     void reveal(int row);
