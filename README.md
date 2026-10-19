@@ -176,7 +176,11 @@ list, every row of it (an English or coined word written on purpose);
 **Remember Correction** keeps the selected word's chosen correction as your own
 (e.g. "Paypal" → PayPal): from then on it is that word's only suggestion, with
 score 0, so sure, also while typing; **Own Correction** asks for a correction of
-your own and keeps it the same way, also for a word without suggestions (**Show**
+your own, starting from the word as typed, and keeps it the same way, also for
+a word without suggestions, or (**With the words before and after**) replaces
+the word together with its neighbours, in that place only. One row is
+selected at a time: Up and Down move between rows, Alt+Down opens the row's
+corrections (**Show**
 can list those alone). **Tools > User Dictionary** (also in the
 window) lists your words and corrections, shared with other programs, to remove
 those no longer wanted.
