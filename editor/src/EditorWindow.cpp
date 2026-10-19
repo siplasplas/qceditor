@@ -261,7 +261,7 @@ void EditorWindow::createMenus()
         forEachTab([](EditorTab* tab) { tab->recheckSpelling(); });
     });
     // The selection's misspelled words, or the whole text's, to confirm their corrections.
-    addAction(m_toolsMenu, tr("&Review Spelling..."), QKeySequence(Qt::Key_F7), [this]() {
+    addAction(m_toolsMenu, tr("&Review Spelling..."), QKeySequence(Qt::Key_F6), [this]() {
         if (auto* tab = currentTab()) tab->reviewSpelling();
     });
     // Common words before rare ones in the suggestions; the list of a

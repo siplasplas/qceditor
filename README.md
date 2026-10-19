@@ -151,7 +151,7 @@ from GitHub, into `~/.local/share/word-frequencies`, shared with other
 programs); after a Yes the lists of other languages are downloaded when first
 needed, without asking. **Tools > Download Word Frequencies for Spelling**
 turns this on or off. Without the lists suggestions work as before.
-**Tools > Review Spelling** (F7) opens a window, not modal (the tab is
+**Tools > Review Spelling** (F6) opens a window, not modal (the tab is
 read-only and not reloaded from disk while it is open, the other tabs and
 windows go on), with the
 misspelled words of the selection,
