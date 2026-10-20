@@ -36,13 +36,14 @@ endif()
 # 1.35: the user's own corrections, UserDictionaryDialog
 # 1.37: openSpellingReview(), a Review Spelling window that is not modal
 # 1.38: suggestions kept, a second review at once
+# 1.46: the user's spelling data in SQLite, words ignored per file
 foreach(package qcodeedit qcodeedit-kate qcodeedit-katedata qcodeedit-encoding qcodeedit-spell qcodeedit-spelldata qcodeedit-diff)
     string(REPLACE "qcodeedit-" "" component ${package})
     if(package STREQUAL "qcodeedit")
         set(component qcodeedit)
     endif()
     if(NOT TARGET qcodeedit::${component})
-        find_package(${package} 1.38.0 REQUIRED)
+        find_package(${package} 1.46.0 REQUIRED)
     endif()
 endforeach()
 

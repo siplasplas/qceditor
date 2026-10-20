@@ -135,8 +135,10 @@ remembered): misspelled words get a wavy red underline, in source code only in
 comments, strings and documentation, in plain text everywhere; identifiers,
 addresses and paths are not checked. Right-clicking a misspelled word offers up
 to 8 suggestions (choosing one replaces the word, undone in one step), **Add to
-Dictionary** (a user dictionary shared with other siplasplas programs,
-`~/.local/share/siplasplas/spell/`) and **Ignore** (this document, this session).
+Dictionary** (a user dictionary shared with other siplasplas programs, in
+`~/.local/share/siplasplas/spell/spelling.sqlite`) and **Ignore** (in this file,
+also after it is opened again; Save As takes the ignored words along; without
+a file, for this session).
 Alt+Enter opens the same choices for the misspelled word at the cursor, below
 it, to pick with the keyboard. Usually there is one suggestion, three at most:
 only those nearly as good as the best are offered, and none when every

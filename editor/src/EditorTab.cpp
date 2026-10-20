@@ -1029,6 +1029,8 @@ bool EditorTab::loadFile(const QString& path)
     m_language = {};
     ++m_languageRequest;
     m_filePath = path;
+    // The words ignored in the file are kept for it.
+    m_spelling->setDocumentPath(m_filePath);
     m_diskModified = {};
     m_diskSize = -1;
     m_formatChanged = false;
@@ -1121,6 +1123,8 @@ bool EditorTab::readFile(const QString& path, bool resetSyntax, const QString& e
     emit statusChanged();
     m_formatChanged = false;
     m_filePath = path;
+    // The words ignored in the file are kept for it.
+    m_spelling->setDocumentPath(m_filePath);
     m_diskModified = modified;
     m_diskSize = size;
 
@@ -1185,7 +1189,10 @@ bool EditorTab::saveAs(const QString& path)
         return false;
 
     const bool renamed = path != m_filePath;
+    // Saved as another file: the words ignored in the text go with it too.
+    if (renamed && !m_filePath.isEmpty()) qce::spell::copySpellingData(m_filePath, path);
     m_filePath = path;
+    m_spelling->setDocumentPath(m_filePath);
     updateDiskStamp();
     m_savedText = m_doc->toPlainText();
     m_formatChanged = false;
