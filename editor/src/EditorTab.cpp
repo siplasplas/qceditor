@@ -23,6 +23,8 @@
 #include <QSignalBlocker>
 #include <QDateTime>
 #include <QDialogButtonBox>
+#include <QFormLayout>
+#include <QSpinBox>
 #include <QInputDialog>
 #include <QLineEdit>
 #include <QRegularExpression>
@@ -608,6 +610,47 @@ static const char* kSpellingEnabledKey = "spelling/enabled";
 static const char* kRecentSpellingKey = "spelling/recentDictionaries";
 static const char* kCorrectWhileTypingKey = "spelling/correctWhileTyping";
 static const char* kReviewCheckedAtFirstKey = "spelling/reviewCheckedAtFirst";
+static const char* kReviewBlockLinesKey = "spelling/reviewBlockLines";
+
+namespace {
+
+// A block of lines by its number, shown as its lines ("1001–2000"): Up goes
+// to the next block.
+class LineBlockSpinBox : public QSpinBox {
+public:
+    LineBlockSpinBox(int lineCount, QWidget* parent) : QSpinBox(parent), m_lineCount(lineCount) {}
+    void setBlockLines(int lines) {
+        m_blockLines = qMax(1, lines);
+        setMaximum(qMax(0, (m_lineCount - 1) / m_blockLines));
+        // The text follows the size even when the number stays.
+        const int value = this->value();
+        blockSignals(true);
+        setValue(value + 1);
+        setValue(value);
+        blockSignals(false);
+        lineEdit()->setText(textFromValue(this->value()));
+    }
+    int firstLine() const { return value() * m_blockLines; }  // 0-based
+    int lastLine() const { return qMin(m_lineCount, firstLine() + m_blockLines) - 1; }
+
+protected:
+    QString textFromValue(int value) const override {
+        const int first = value * m_blockLines + 1;
+        return QStringLiteral("%1–%2").arg(first).arg(qMin(m_lineCount, first + m_blockLines - 1));
+    }
+    int valueFromText(const QString& text) const override {
+        // The first line typed (or the only number): its block.
+        const int line = text.section(QChar(u'–'), 0, 0).section(QLatin1Char('-'), 0, 0).trimmed().toInt();
+        return qMax(0, line - 1) / m_blockLines;
+    }
+    QValidator::State validate(QString&, int&) const override { return QValidator::Acceptable; }
+
+private:
+    int m_lineCount;
+    int m_blockLines = 1000;
+};
+
+} // namespace
 static const char* kDefaultLanguageKey = "spelling/defaultLanguage";
 static constexpr int kRecentSpellingCount = 6;
 
@@ -771,6 +814,55 @@ void EditorTab::reviewSpelling()
         settings().setValue(kReviewCheckedAtFirstKey, qce::spell::checkedAtFirstName(chosen));
         if (corrected > 0) emit message(tr("%n word(s) corrected; Ctrl+Z undoes it", nullptr, corrected));
     });
+}
+
+void EditorTab::reviewSpellingBlock()
+{
+    if (m_review) {
+        reviewSpelling();
+        return;
+    }
+    qce::CodeEditArea* area = m_edit->area();
+    const qce::ITextDocument* doc = area->document();
+    if (!doc) return;
+    // Lines as the user counts them: not the empty one after a final newline.
+    int lineCount = doc->lineCount();
+    if (lineCount > 1 && doc->lineAt(lineCount - 1).isEmpty()) --lineCount;
+
+    QDialog ask(this);
+    ask.setWindowTitle(tr("Review Spelling of Lines"));
+    auto* layout = new QVBoxLayout(&ask);
+    layout->addWidget(new QLabel(tr("The text has %n line(s).", nullptr, lineCount), &ask));
+    auto* form = new QFormLayout;
+    auto* size = new QSpinBox(&ask);
+    size->setRange(1, 1000000);
+    size->setValue(settings().value(kReviewBlockLinesKey, 1000).toInt());
+    form->addRow(tr("Lines in a &block:"), size);
+    auto* block = new LineBlockSpinBox(lineCount, &ask);
+    block->setToolTip(tr("Up: the next block, Down: the one before; Enter reviews it"));
+    block->setBlockLines(size->value());
+    block->setValue(m_reviewBlock);
+    form->addRow(tr("&Lines:"), block);
+    layout->addLayout(form);
+    connect(size, &QSpinBox::valueChanged, block, [block](int lines) { block->setBlockLines(lines); });
+    auto* buttons = new QDialogButtonBox(QDialogButtonBox::Ok | QDialogButtonBox::Cancel, &ask);
+    buttons->button(QDialogButtonBox::Ok)->setText(tr("&Review"));
+    connect(buttons, &QDialogButtonBox::accepted, &ask, &QDialog::accept);
+    connect(buttons, &QDialogButtonBox::rejected, &ask, &QDialog::reject);
+    layout->addWidget(buttons);
+    // The block chosen last is shown again: Up and Enter go on to the next.
+    block->setFocus();
+    block->selectAll();
+    if (ask.exec() != QDialog::Accepted) return;
+    settings().setValue(kReviewBlockLinesKey, size->value());
+    m_reviewBlock = block->value();
+    // Those lines selected, from their start (in sight), and reviewed; the
+    // window has found its words when it opens, so the selection goes then:
+    // nothing typed or corrected meanwhile lands on a selected block.
+    const int first = block->firstLine(), last = block->lastLine();
+    area->setSelection({last, int(doc->lineAt(last).size())}, {first, 0});
+    reviewSpelling();
+    area->setCursorPosition({first, 0});
 }
 
 void EditorTab::addSpellingMenu(QMenu& menu, const QPoint& position)

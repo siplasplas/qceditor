@@ -264,6 +264,10 @@ void EditorWindow::createMenus()
     addAction(m_toolsMenu, tr("&Review Spelling..."), QKeySequence(Qt::Key_F6), [this]() {
         if (auto* tab = currentTab()) tab->reviewSpelling();
     });
+    // Long texts a block of lines at a time.
+    addAction(m_toolsMenu, tr("Review Spelling of &Lines..."), QKeySequence(Qt::SHIFT | Qt::Key_F6), [this]() {
+        if (auto* tab = currentTab()) tab->reviewSpellingBlock();
+    });
     // Common words before rare ones in the suggestions; the list of a
     // language is fetched when a dictionary of it is first used.
     m_wordFrequencies = m_toolsMenu->addAction(tr("Download &Word Frequencies for Spelling"));

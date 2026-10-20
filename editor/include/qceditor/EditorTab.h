@@ -155,6 +155,12 @@ public:
     /// Spelling). The window is not modal; the tab is read-only while it is
     /// open.
     void reviewSpelling();
+    /// Reviews a block of lines (Tools > Review Spelling of Lines, Shift+F6):
+    /// asks which, showing how many lines the text has, a block of a size
+    /// the user sets (1000 by default, kept in the settings) by its lines
+    /// ("1001–2000"); the block chosen last in this tab is shown again, so
+    /// Up and Enter go on to the next. Selects those lines and reviews them.
+    void reviewSpellingBlock();
     /// The user's own words and corrections, to look over or remove (Tools >
     /// User Dictionary); recheck the tabs afterwards.
     void showUserDictionary();
@@ -250,6 +256,7 @@ private:
     qce::spell::CodeEditSpelling* m_spelling = nullptr;
     /// The open Review Spelling window (not modal; the tab is read-only meanwhile).
     QPointer<qce::spell::SpellingReviewDialog> m_review;
+    int m_reviewBlock = 0;  ///< the block of lines reviewed last (reviewSpellingBlock())
     QStringList m_spellLanguages;  ///< chosen for this document; empty = detected
     QString m_spellMissing;        ///< language whose missing dictionary was reported
     qce::encoding::EncodingGuard* m_encoding = nullptr;

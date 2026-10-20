@@ -160,24 +160,20 @@ read-only and not reloaded from disk while it is open, the other tabs and
 windows go on), with the
 misspelled words of the selection,
 or of the whole text, with a correction for each, their line and context.
-**Checked at first** chooses which words are checked when it opens: the sure
-corrections only (a single suggestion close to the word, e.g. "bhyc" → być, not
-"agents" → agent), the words with a single suggestion, close or not, or every
-word with its first correction (remembered), or only the words with several
-suggestions ("Several") or with several whose first one would be sure alone
-("Several, first close"), or only those without suggestions that you gave
-your own correction, to look them over with **Show** set to the checked ones;
-the
-others are checked by hand with their check boxes (picking a correction checks
-the word, also the one shown, only with **Picking a correction checks the
-word** on).
-**None** checks nothing and shows every word, to check by hand. The list shows
-the words of the kind chosen in **Checked at first**: **Show**
-picks all of them, the checked ones (to look over what will change) or the
-unchecked ones (e.g. with "Words without suggestions": those still without
-your own correction), or **Every word**; Ctrl+C or the context menu copies
-the selected rows (word, correction, score, line and the whole line of text,
-separated by tabs) or only their lines of text. The
+It is made for reviewing a text a kind of word at a time: **Show** lists the
+words of one kind (remembered): all words, sure corrections (a single
+suggestion close to the word, e.g. "byc" → być, not "agents" → agent), a
+single suggestion, a single one not sure, several suggestions with the first
+sure, with the first not sure, or any, and words without suggestions. Nothing
+is checked at first: an action applied checks or unchecks all the words shown
+(**Check all**, **Uncheck all**) or the rows selected (**Check selected
+rows**, **Uncheck selected rows**: then several rows are selected with Ctrl
+and Shift, e.g. sorted by score from the first above 1 down to the end); a
+row's check box checks one word (picking a correction checks it too only with
+**Picking a correction checks the word** on). Ctrl+C or the context menu
+copies the selected rows (word, correction, score, line and the whole line of
+text, separated by tabs) or only their lines of text; a double click on a row
+shows the word in the text. The
 window says how long finding the corrections took (seconds, and milliseconds a
 word); the tab keeps what it found, so opening the window again looks only for
 words it has not seen (about 45 s the first time and under a second afterwards
@@ -185,17 +181,25 @@ for 6000 misspelled words). **Add to Dictionary** and **Ignore** take the select
 list, every row of it (an English or coined word written on purpose);
 **Remember Correction** keeps the selected word's chosen correction as your own
 (e.g. "Paypal" → PayPal): from then on it is that word's only suggestion, with
-score 0, so sure, also while typing; **Own Correction** asks for a correction of
-your own, starting from the word as typed, and keeps it the same way, also for
-a word without suggestions, or (**With the words before and after**) replaces
-the word together with its neighbours, in that place only. One row is
-selected at a time: Up and Down move between rows, Alt+Down opens the row's
-corrections (**Show**
-can list those alone). **Tools > User Dictionary** (also in the
-window) lists your words and corrections, shared with other programs, to remove
-those no longer wanted.
-**Correct** replaces the checked words, all of them one undo step; nothing
-changes without it.
+score 0, so sure, also while typing; **Own Correction** (Ctrl+F6) asks for a
+correction of your own, starting from the word as typed, and keeps it the same
+way, also for a word without suggestions, or (**With the words before and
+after**) replaces the word together with its neighbours, in that place only.
+Up and Down move between rows, Alt+Down opens the row's corrections.
+**Tools > User Dictionary** (also in the window) lists your words and
+corrections, shared with other programs, to remove those no longer wanted.
+**Correct** replaces the checked words of the kind shown, one undo step, takes
+them out of the list and leaves the window open for the next kind; **Correct
+and Close** also closes it; nothing changes otherwise, and the words of other
+kinds stay for the next review. A sure-corrections-first routine: Show "Sure
+corrections", Check all, Correct; then "Single suggestion, not sure", look
+them over, check some, Correct; and so on.
+**Tools > Review Spelling of Lines** (Shift+F6) reviews a long text a block of
+lines at a time: it says how many lines the text has and asks for a block of
+a size you set (1000 lines by default, remembered), shown by its lines
+("1001–2000"); the block chosen last in the tab is shown again, so Up and
+Enter go on to the next one. Its lines are selected for the review, and the
+selection goes once the window has found its words.
 **Tools > Correct Spelling While Typing** (off by default, remembered) corrects
 a misspelled word with a sure correction as soon as a space or punctuation is
 typed after it ("bhyc " becomes "być "); the status bar says so, and Ctrl+Z
