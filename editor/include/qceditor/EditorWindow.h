@@ -115,6 +115,7 @@ private:
     void updateSyntaxData();
 
     qce::spell::WordFrequencyDownloader* frequencyDownloader();
+    void downloadMissingWordFrequencies();
     /// Word frequencies for the dictionaries' languages that have none: asked
     /// once, then downloaded when needed (Tools > Download Word Frequencies
     /// for Spelling).

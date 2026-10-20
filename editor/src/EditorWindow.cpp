@@ -270,7 +270,8 @@ void EditorWindow::createMenus()
     m_wordFrequencies->setCheckable(true);
     m_wordFrequencies->setChecked(settings().value(kWordFrequenciesKey, false).toBool());
     m_wordFrequencies->setToolTip(tr("Spelling suggestions put common words first; the list of the most "
-                                     "frequent words of a language is downloaded when it is first needed"));
+                                     "frequent words of each language with a dictionary installed is "
+                                     "downloaded when missing"));
     connect(m_wordFrequencies, &QAction::toggled, this, [this](bool download) {
         settings().setValue(kWordFrequenciesKey, download);
         if (!download) return;
@@ -279,7 +280,11 @@ void EditorWindow::createMenus()
         forEachTab([&dictionaries](EditorTab* tab) { dictionaries << tab->spellingDictionaries(); });
         dictionaries.removeDuplicates();
         offerWordFrequencies(dictionaries);
+        downloadMissingWordFrequencies();
     });
+    // Languages whose dictionary was installed since: their lists too, once
+    // the window is up.
+    QTimer::singleShot(0, this, &EditorWindow::downloadMissingWordFrequencies);
     auto* askReload = m_toolsMenu->addAction(tr("&Ask to Reload Modified Files"));
     askReload->setCheckable(true);
     askReload->setChecked(askToReloadModified());
@@ -808,9 +813,29 @@ void EditorWindow::offerWordFrequencies(const QStringList& dictionaries)
     downloadNextWordFrequencies();
 }
 
+// With downloading on (never asked here): the missing list of every language
+// with a dictionary installed, one dictionary of each language (de_DE, de_AT
+// share the German list).
+void EditorWindow::downloadMissingWordFrequencies()
+{
+    if (!settings().value(kWordFrequenciesKey, false).toBool()) return;
+    QStringList dictionaries;
+    QSet<QString> languages;
+    for (const auto& dictionary : qce::spell::installedDictionaries())
+        if (!languages.contains(dictionary.language)) {
+            languages.insert(dictionary.language);
+            dictionaries << dictionary.name;
+        }
+    offerWordFrequencies(dictionaries);
+}
+
 void EditorWindow::downloadNextWordFrequencies()
 {
-    if (m_frequencyQueue.isEmpty() || frequencyDownloader()->busy()) return;
+    if (frequencyDownloader()->busy()) return;
+    // Another dictionary of the language may have brought its list meanwhile.
+    while (!m_frequencyQueue.isEmpty() && qce::spell::hasWordFrequencies(m_frequencyQueue.first()))
+        m_frequencyQueue.removeFirst();
+    if (m_frequencyQueue.isEmpty()) return;
     const QString dictionary = m_frequencyQueue.takeFirst();
     statusBar()->showMessage(tr("Downloading word frequencies for %1…").arg(dictionaryDisplayName(dictionary)));
     frequencyDownloader()->start(dictionary);

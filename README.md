@@ -151,7 +151,9 @@ dictionary without one is used, the editor asks whether to download it
 (FrequencyWords, from film subtitles, CC-BY-SA 4.0, under 1 MB per language,
 from GitHub, into `~/.local/share/word-frequencies`, shared with other
 programs); after a Yes the lists of other languages are downloaded when first
-needed, without asking. **Tools > Download Word Frequencies for Spelling**
+needed, without asking, and at each start the missing list of every language
+with a dictionary installed (one list per language: de_DE and de_AT share
+the German one). **Tools > Download Word Frequencies for Spelling**
 turns this on or off. Without the lists suggestions work as before.
 **Tools > Review Spelling** (F6) opens a window, not modal (the tab is
 read-only and not reloaded from disk while it is open, the other tabs and
