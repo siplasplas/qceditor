@@ -200,6 +200,21 @@ a size you set (1000 lines by default, remembered), shown by its lines
 ("1001–2000"); the block chosen last in the tab is shown again, so Up and
 Enter go on to the next one. Its lines are selected for the review, and the
 selection goes once the window has found its words.
+**Grammar**: with the grammar's data files installed (see qcodeedit's
+`docs/SPELL.md`; for Polish `pl.morph` and two optional tables in
+`~/.local/share/siplasplas/spell/grammar`), words spelled right that do not
+fit together are underlined in blue: a preposition before the wrong case
+("ze jest": że), an adjective not agreeing with its noun ("piękna
+dziewczynę": piękną), two verbs where a noun one slip away is the subject
+("Mam dzwoniła": Mama), a rare word one diacritic from a common one ("juz":
+już). The context menu and Alt+Enter show the problem and the corrections.
+**Tools > Review Grammar** (Ctrl+F6) lists the mistakes of the
+selection's lines, or of the whole text, in a window like the spelling one:
+the words, the problem, a correction to choose, line and context; **Show**
+picks one kind; **Correct** corrects the checked ones shown, one undo step,
+and looks again; **Tools > Review Grammar of Lines** (Ctrl+Shift+F6) does
+it a block of lines at a time, chosen as for spelling. **Tools > Check
+Grammar** (on by default, remembered) turns it off.
 **Tools > Correct Spelling While Typing** (off by default, remembered) corrects
 a misspelled word with a sure correction as soon as a space or punctuation is
 typed after it ("bhyc " becomes "być "); the status bar says so, and Ctrl+Z

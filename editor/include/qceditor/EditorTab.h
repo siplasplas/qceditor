@@ -18,7 +18,7 @@ class QLabel;
 class QMenu;
 class QVBoxLayout;
 namespace qce::encoding { class EncodingGuard; }
-namespace qce::spell { class CodeEditSpelling; class SpellingReviewDialog; }
+namespace qce::spell { class CodeEditSpelling; class SpellingReviewDialog; class GrammarReviewDialog; }
 
 namespace qceditor {
 
@@ -140,6 +140,11 @@ public:
     /// Typing), saved in the settings; off by default.
     static bool correctWhileTyping();
     static void setCorrectWhileTyping(bool correct);
+    /// Grammar checking (Tools > Check Grammar), saved in the settings; on by
+    /// default. Works when the grammar's data files are installed (see
+    /// qcodeedit's docs/SPELL.md); underlines in blue.
+    static bool grammarCheckingEnabled();
+    static void setGrammarCheckingEnabled(bool enabled);
     /// The spelling dictionary of a new text, and of one too short to tell
     /// its language (Tools > Default Spelling Language), e.g. "pl_PL";
     /// empty: the desktop's language. Saved in the settings.
@@ -150,6 +155,13 @@ public:
     /// The corrections of the misspelled word at the cursor in a menu below
     /// it, to choose with the keyboard (Alt+Enter).
     void showSpellingCorrections();
+    /// The grammar mistakes of the selection's lines (or the whole text) in a
+    /// window to choose their corrections (Tools > Review Grammar, Ctrl+F6).
+    /// The window is not modal; the tab is read-only while it is open.
+    void reviewGrammar();
+    /// Reviews the grammar of a block of lines (Tools > Review Grammar of
+    /// Lines, Ctrl+Shift+F6), chosen as for reviewSpellingBlock().
+    void reviewGrammarBlock();
     /// The misspelled words of the selection (or the whole text) in a window
     /// to confirm their corrections, applied as one undo step (Tools > Review
     /// Spelling). The window is not modal; the tab is read-only while it is
@@ -164,8 +176,8 @@ public:
     /// The user's own words and corrections, to look over or remove (Tools >
     /// User Dictionary); recheck the tabs afterwards.
     void showUserDictionary();
-    /// Its Review Spelling window is open (the tab is read-only, and is not
-    /// reloaded from disk meanwhile).
+    /// Its Review Spelling or Review Grammar window is open (the tab is
+    /// read-only, and is not reloaded from disk meanwhile).
     bool spellingReviewOpen() const;
     /// Checks the visible text again (e.g. after the user dictionary changed).
     void recheckSpelling();
@@ -223,6 +235,11 @@ private:
     /// Suggestions, Add to Dictionary and Ignore for the misspelled word at
     /// `position`; false when there is none.
     bool addSpellingCorrections(QMenu& menu, qce::TextCursor position);
+    /// The problem and the corrections of the grammar mistake at `position`;
+    /// false when there is none.
+    bool addGrammarCorrections(QMenu& menu, qce::TextCursor position);
+    /// Asks for a block of lines, selects it and reviews its spelling or grammar.
+    void reviewBlock(bool grammar);
     static QString spaceCorrectionText(const QString& typed, const QString& replacement);
     void updateDiskStamp();
     void onDocumentChanged();
@@ -256,6 +273,7 @@ private:
     qce::spell::CodeEditSpelling* m_spelling = nullptr;
     /// The open Review Spelling window (not modal; the tab is read-only meanwhile).
     QPointer<qce::spell::SpellingReviewDialog> m_review;
+    QPointer<qce::spell::GrammarReviewDialog> m_grammarReview;
     int m_reviewBlock = 0;  ///< the block of lines reviewed last (reviewSpellingBlock())
     QStringList m_spellLanguages;  ///< chosen for this document; empty = detected
     QString m_spellMissing;        ///< language whose missing dictionary was reported

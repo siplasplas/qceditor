@@ -255,6 +255,16 @@ void EditorWindow::createMenus()
         EditorTab::setCorrectWhileTyping(on);
         forEachTab([](EditorTab* tab) { tab->updateSpellChecking(); });
     });
+    // Grammar, of words spelled right, when its data files are installed.
+    auto* grammar = m_toolsMenu->addAction(tr("Check &Grammar"));
+    grammar->setCheckable(true);
+    grammar->setChecked(EditorTab::grammarCheckingEnabled());
+    grammar->setToolTip(tr("Blue underlines under words that do not fit together (\"ze jest\": że), when the "
+                           "grammar's data files are installed"));
+    connect(grammar, &QAction::toggled, this, [this](bool enabled) {
+        EditorTab::setGrammarCheckingEnabled(enabled);
+        forEachTab([](EditorTab* tab) { tab->updateSpellChecking(); });
+    });
     m_toolsMenu->addAction(tr("Default Spelling &Language..."), this, &EditorWindow::chooseDefaultSpellLanguage);
     m_toolsMenu->addAction(tr("User &Dictionary..."), this, [this]() {
         if (auto* tab = currentTab()) tab->showUserDictionary();
@@ -263,6 +273,13 @@ void EditorWindow::createMenus()
     // The selection's misspelled words, or the whole text's, to confirm their corrections.
     addAction(m_toolsMenu, tr("&Review Spelling..."), QKeySequence(Qt::Key_F6), [this]() {
         if (auto* tab = currentTab()) tab->reviewSpelling();
+    });
+    // The grammar mistakes of the selection's lines, or the whole text's.
+    addAction(m_toolsMenu, tr("Review &Grammar..."), QKeySequence(Qt::CTRL | Qt::Key_F6), [this]() {
+        if (auto* tab = currentTab()) tab->reviewGrammar();
+    });
+    addAction(m_toolsMenu, tr("Review Grammar of L&ines..."), QKeySequence(Qt::CTRL | Qt::SHIFT | Qt::Key_F6), [this]() {
+        if (auto* tab = currentTab()) tab->reviewGrammarBlock();
     });
     // Long texts a block of lines at a time.
     addAction(m_toolsMenu, tr("Review Spelling of &Lines..."), QKeySequence(Qt::SHIFT | Qt::Key_F6), [this]() {

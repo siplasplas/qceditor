@@ -36,6 +36,7 @@
 #include <QGuiApplication>
 #include <QShortcut>
 #include "EenFile.h"
+#include <qce/spell/GrammarReview.h>
 #include <qce/spell/SpellingReview.h>
 #include <qce/spell/UserDictionaryDialog.h>
 #include <QHash>
@@ -92,6 +93,7 @@ EditorTab::EditorTab(QWidget* parent)
     m_spelling = new qce::spell::CodeEditSpelling(m_edit->area(), this);
     m_spelling->setEnabled(spellCheckingEnabled());
     m_spelling->setCorrectWhileTyping(correctWhileTyping());
+    m_spelling->setGrammarEnabled(grammarCheckingEnabled());
     connect(m_spelling, &qce::spell::CodeEditSpelling::corrected, this,
             [this](const QString& typed, const QString& correction) {
         emit message(tr("Corrected \"%1\" to \"%2\"; Ctrl+Z brings it back").arg(typed, correction));
@@ -610,6 +612,7 @@ static const char* kSpellingEnabledKey = "spelling/enabled";
 static const char* kRecentSpellingKey = "spelling/recentDictionaries";
 static const char* kCorrectWhileTypingKey = "spelling/correctWhileTyping";
 static const char* kReviewCheckedAtFirstKey = "spelling/reviewCheckedAtFirst";
+static const char* kGrammarEnabledKey = "spelling/grammar";
 static const char* kReviewBlockLinesKey = "spelling/reviewBlockLines";
 
 namespace {
@@ -674,6 +677,16 @@ void EditorTab::setCorrectWhileTyping(bool correct)
     settings().setValue(kCorrectWhileTypingKey, correct);
 }
 
+bool EditorTab::grammarCheckingEnabled()
+{
+    return settings().value(kGrammarEnabledKey, true).toBool();
+}
+
+void EditorTab::setGrammarCheckingEnabled(bool enabled)
+{
+    settings().setValue(kGrammarEnabledKey, enabled);
+}
+
 QString EditorTab::defaultSpellLanguage()
 {
     return settings().value(kDefaultLanguageKey).toString();
@@ -689,6 +702,7 @@ void EditorTab::updateSpellChecking()
 {
     m_spelling->setEnabled(spellCheckingEnabled());
     m_spelling->setCorrectWhileTyping(correctWhileTyping());
+    m_spelling->setGrammarEnabled(grammarCheckingEnabled());
     applySpellLanguages();
 }
 
@@ -767,14 +781,34 @@ bool EditorTab::addSpellingCorrections(QMenu& menu, qce::TextCursor position)
     return true;
 }
 
-// Alt+Enter: the corrections of the misspelled word at the cursor, below
-// it, to choose with the keyboard.
+bool EditorTab::addGrammarCorrections(QMenu& menu, qce::TextCursor position)
+{
+    if (!m_spelling->isEnabled()) return false;
+    const auto mistake = m_spelling->grammarMistakeAt(position);
+    if (!mistake) return false;
+    // The problem first, as a title.
+    menu.addAction(QString(mistake->issue.message.isEmpty() ? tr("Grammar") : mistake->issue.message)
+                       .replace("&", "&&"))->setEnabled(false);
+    if (mistake->corrections.isEmpty())
+        menu.addAction(tr("No suggestions"))->setEnabled(false);
+    for (const auto& [range, replacement] : mistake->corrections) {
+        auto* action = menu.addAction(spaceCorrectionText(range.word, replacement));
+        connect(action, &QAction::triggered, this, [this, range, replacement]() {
+            m_spelling->replaceWord(range, replacement);
+        });
+    }
+    return true;
+}
+
+// Alt+Enter: the corrections of the misspelled word (or grammar mistake) at
+// the cursor, below it, to choose with the keyboard.
 void EditorTab::showSpellingCorrections()
 {
     auto* area = m_edit->area();
     QMenu menu(this);
-    if (!addSpellingCorrections(menu, area->cursorPosition())) {
-        emit message(tr("No misspelled word at the cursor"));
+    if (!addSpellingCorrections(menu, area->cursorPosition())
+            && !addGrammarCorrections(menu, area->cursorPosition())) {
+        emit message(tr("No misspelled word or grammar mistake at the cursor"));
         return;
     }
     const QRect caret = area->inputMethodQuery(Qt::ImCursorRectangle).toRect();
@@ -788,7 +822,26 @@ void EditorTab::showUserDictionary()
 
 bool EditorTab::spellingReviewOpen() const
 {
-    return !m_review.isNull();
+    return !m_review.isNull() || !m_grammarReview.isNull();
+}
+
+void EditorTab::reviewGrammar()
+{
+    // One window a tab: a second request brings it to the front.
+    if (m_grammarReview) {
+        m_grammarReview->raise();
+        m_grammarReview->activateWindow();
+        return;
+    }
+    if (m_review) {
+        emit message(tr("Close the Review Spelling window first"));
+        return;
+    }
+    m_grammarReview = qce::spell::openGrammarReview(*m_spelling, this);
+    if (!m_grammarReview) return;
+    connect(m_grammarReview, &qce::spell::GrammarReviewDialog::reviewFinished, this, [this](int corrected) {
+        if (corrected > 0) emit message(tr("%n mistake(s) corrected; Ctrl+Z undoes it", nullptr, corrected));
+    });
 }
 
 void EditorTab::recheckSpelling()
@@ -802,6 +855,10 @@ void EditorTab::reviewSpelling()
     if (m_review) {
         m_review->raise();
         m_review->activateWindow();
+        return;
+    }
+    if (m_grammarReview) {
+        emit message(tr("Close the Review Grammar window first"));
         return;
     }
     // What the window checks at first is the program's setting.
@@ -818,8 +875,19 @@ void EditorTab::reviewSpelling()
 
 void EditorTab::reviewSpellingBlock()
 {
-    if (m_review) {
-        reviewSpelling();
+    reviewBlock(false);
+}
+
+void EditorTab::reviewGrammarBlock()
+{
+    reviewBlock(true);
+}
+
+void EditorTab::reviewBlock(bool grammar)
+{
+    const auto review = [this, grammar]() { grammar ? reviewGrammar() : reviewSpelling(); };
+    if (grammar ? !m_grammarReview.isNull() : !m_review.isNull()) {
+        review();
         return;
     }
     qce::CodeEditArea* area = m_edit->area();
@@ -830,7 +898,7 @@ void EditorTab::reviewSpellingBlock()
     if (lineCount > 1 && doc->lineAt(lineCount - 1).isEmpty()) --lineCount;
 
     QDialog ask(this);
-    ask.setWindowTitle(tr("Review Spelling of Lines"));
+    ask.setWindowTitle(grammar ? tr("Review Grammar of Lines") : tr("Review Spelling of Lines"));
     auto* layout = new QVBoxLayout(&ask);
     layout->addWidget(new QLabel(tr("The text has %n line(s).", nullptr, lineCount), &ask));
     auto* form = new QFormLayout;
@@ -861,14 +929,15 @@ void EditorTab::reviewSpellingBlock()
     // nothing typed or corrected meanwhile lands on a selected block.
     const int first = block->firstLine(), last = block->lastLine();
     area->setSelection({last, int(doc->lineAt(last).size())}, {first, 0});
-    reviewSpelling();
+    review();
     area->setCursorPosition({first, 0});
 }
 
 void EditorTab::addSpellingMenu(QMenu& menu, const QPoint& position)
 {
     // customContextMenuRequested gives the click in the viewport's coordinates.
-    if (addSpellingCorrections(menu, m_edit->area()->cursorAt(position)))
+    const qce::TextCursor at = m_edit->area()->cursorAt(position);
+    if (addSpellingCorrections(menu, at) || addGrammarCorrections(menu, at))
         menu.addSeparator();
 
     // Recent dictionaries and the ones in use; up to two at once.

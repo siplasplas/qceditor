@@ -43,7 +43,7 @@ foreach(package qcodeedit qcodeedit-kate qcodeedit-katedata qcodeedit-encoding q
         set(component qcodeedit)
     endif()
     if(NOT TARGET qcodeedit::${component})
-        find_package(${package} 1.63.0 REQUIRED)
+        find_package(${package} 1.65.0 REQUIRED)
     endif()
 endforeach()
 
