@@ -2,6 +2,7 @@
 #include <QDir>
 #include <QFile>
 #include <QFileInfo>
+#include <QIcon>
 #include <QJsonArray>
 #include <QJsonDocument>
 #include <QJsonObject>
@@ -118,6 +119,10 @@ int main(int argc, char* argv[])
     app.setApplicationName("qceditor");
     app.setApplicationDisplayName("QCEditor");
     app.setApplicationVersion(QStringLiteral(QCEDITOR_VERSION));
+    // The window icon (Alt+Tab, the title bar); the dock finds the installed
+    // qceditor.desktop by this name (the Wayland app id, X11 WM_CLASS qceditor)
+    app.setWindowIcon(QIcon(QStringLiteral(":/qceditor.svg")));
+    QGuiApplication::setDesktopFileName(QStringLiteral("qceditor"));
 
     // Moves the files of older versions, once, before anything reads them.
     QxMigrationSpec migration;

@@ -1,0 +1,12 @@
+[Desktop Entry]
+Type=Application
+Name=QCEditor
+GenericName=Text Editor
+Comment=Code editor with Kate syntax highlighting, folding and spell checking
+Exec=@CMAKE_INSTALL_FULL_BINDIR@/qceditor %F
+Icon=qceditor
+Terminal=false
+Categories=Utility;TextEditor;Qt;
+MimeType=text/plain;
+StartupNotify=true
+StartupWMClass=qceditor

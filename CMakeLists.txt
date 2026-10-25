@@ -64,4 +64,12 @@ if(QCEDITOR_BUILD_APP)
         qceditor::editor
         qcodeedit::katedata
     )
+    # The icon: the window's (Alt+Tab on X11) from the resources, and for the
+    # desktop (the Ubuntu dock, Wayland) in the icon theme with a .desktop file
+    # whose name is the application's desktop file name
+    qt_add_resources(qceditor "icon" PREFIX "/" BASE res FILES res/qceditor.svg)
+    install(TARGETS qceditor RUNTIME DESTINATION ${CMAKE_INSTALL_BINDIR})
+    configure_file(res/qceditor.desktop.in ${CMAKE_CURRENT_BINARY_DIR}/qceditor.desktop @ONLY)
+    install(FILES ${CMAKE_CURRENT_BINARY_DIR}/qceditor.desktop DESTINATION ${CMAKE_INSTALL_DATADIR}/applications)
+    install(FILES res/qceditor.svg DESTINATION ${CMAKE_INSTALL_DATADIR}/icons/hicolor/scalable/apps)
 endif()
