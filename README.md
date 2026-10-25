@@ -29,6 +29,12 @@ cmake --build build
 ./build/qceditor [file ...]
 ```
 
+`sudo cmake --install build` also installs the application with its icon
+(`share/icons/hicolor/scalable/apps/qceditor.svg`) and
+`share/applications/qceditor.desktop`, so that the desktop (the Ubuntu dock,
+Alt+Tab on Wayland) shows the icon; the window icon comes from the
+resources (`res/qceditor.svg`).
+
 For dependencies installed outside the default search paths, pass
 `-DCMAKE_PREFIX_PATH=/path/to/prefix` when configuring.
 
