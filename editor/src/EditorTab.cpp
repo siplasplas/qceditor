@@ -1267,6 +1267,11 @@ bool EditorTab::readFile(const QString& path, bool resetSyntax, const QString& e
         m_edit->area()->undoStack()->setClean();
     else
         m_edit->area()->undoStack()->clear();
+    // A file opened (not reloaded) starts at its top: with qcodeedit-diff the
+    // text replaces the empty one as an edit, and the cursor went with the
+    // empty line the diff matched, often the last one.
+    if (resetSyntax)
+        m_edit->area()->setCursorPosition({0, 0});
     {
         // Loading is not an edit: no "modified" from the encoding change.
         const QSignalBlocker block(m_encoding);
