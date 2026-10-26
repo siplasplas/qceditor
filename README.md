@@ -271,7 +271,10 @@ navigation changes the editor selection.
 
 Ctrl+R (or Ctrl+H) opens the replacement row. The arrow beside the search field expands
 or collapses it. **Replace** changes the active result; **Replace All** changes
-all included results in one undo step. **Exclude** skips the active result until
+all included results in one undo step, at once (qcodeedit's `replaceRanges()`:
+each run of lines made anew in one pass), so a million matches in lines of tens
+of thousands of characters, e.g. `"` → `&quot;` in JSON lines, take a fraction
+of a second. **Exclude** skips the active result until
 the query/options or document change. **Aa** preserves upper/lower/title case.
 Regex replacements support `$1`, `\1`, `${name}`, and `\n`/`\t` escapes.
 Replacement respects selection-only search and can be undone in the editor.

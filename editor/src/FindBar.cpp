@@ -482,14 +482,20 @@ void FindBar::replaceAll()
 {
     auto* area = m_tab->editor()->area();
     if (m_matches.isEmpty() || area->readOnly()) return;
+    // All at once through qcodeedit (one pass a run of lines, one undo step):
+    // thousands of matches in lines of tens of thousands of characters
+    // ("\"" → "&quot;" in JSON lines) take linear time, not one edit a match.
+    // A replacement without groups or case to follow is the same for every
+    // match: made once.
+    const bool same = !m_preserveCase->isChecked()
+        && !(m_regex->isChecked() && m_replacement->text().contains(QRegularExpression(QStringLiteral(R"([\\$])"))));
+    const QString fixed = same ? replacementFor(m_matches.front()) : QString();
+    QList<qce::CodeEditArea::TextReplacement> ranges;
+    ranges.reserve(m_matches.size());
+    for (const Match& match : std::as_const(m_matches))
+        ranges.append({positionFor(match.start), positionFor(match.end), same ? fixed : replacementFor(match)});
     m_replacing = true;
-    area->undoStack()->beginMacro(tr("Replace All"));
-    // Backwards replacement leaves the coordinates of earlier matches unchanged.
-    for (int i = m_matches.size() - 1; i >= 0; --i) {
-        const auto& match = m_matches[i];
-        area->undoStack()->push(new ReplaceCommand(area, positionFor(match.start), positionFor(match.end), replacementFor(match)));
-    }
-    area->undoStack()->endMacro();
+    area->replaceRanges(ranges, tr("Replace All"));
     m_replacing = false;
     rebuild();
 }
