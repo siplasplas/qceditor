@@ -50,6 +50,9 @@ private:
     QLineEdit* m_query;
     QLineEdit* m_replacement;
     QWidget* m_replaceRow;
+    QList<QShortcut*> m_barShortcuts;  ///< Alt+C, Alt+W, only while the bar is shown
+    /// A selection longer than this (or of several lines) is searched in, not searched for.
+    static constexpr int kLongSelection = 64;
     QToolButton* m_expand;
     QToolButton* m_preserveCase;
     QPushButton* m_replace;

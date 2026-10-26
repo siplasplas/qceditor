@@ -66,8 +66,8 @@ FindBar::FindBar(EditorTab* tab) : QWidget(tab), m_tab(tab)
     m_query->setPlaceholderText(tr("Search"));
     fieldLayout->addWidget(m_query, 1);
     m_wrap = button(QString::fromUtf8("↩"), tr("Wrap around"), true); m_wrap->setChecked(true);
-    m_case = button("Cc", tr("Match case"), true);
-    m_words = button("W", tr("Whole words"), true);
+    m_case = button("Cc", tr("Match case (Alt+C)"), true);
+    m_words = button("W", tr("Whole words (Alt+W)"), true);
     m_regex = button(".*", tr("Regular expression"), true);
     for (auto* b : {m_wrap, m_case, m_words, m_regex}) fieldLayout->addWidget(b);
     field->setMinimumWidth(260); field->setMaximumWidth(360);
@@ -79,7 +79,8 @@ FindBar::FindBar(EditorTab* tab) : QWidget(tab), m_tab(tab)
     m_next = button(QString(), tr("Next match (F3)"));
     m_next->setIcon(style()->standardIcon(QStyle::SP_ArrowDown));
     layout->addWidget(m_previous); layout->addWidget(m_next);
-    m_scope = button(QString::fromUtf8("▽"), tr("Search in selection"), true);
+    m_scope = button(QString::fromUtf8("▽"), tr("Search in selection (set by itself when the bar opens with "
+                                                 "several lines or a long text selected)"), true);
     layout->addWidget(m_scope);
     layout->addStretch();
     auto* close = button(QString(), tr("Close search (Escape)"));
@@ -144,6 +145,14 @@ FindBar::FindBar(EditorTab* tab) : QWidget(tab), m_tab(tab)
     // Only while the bar is shown, so Escape otherwise reaches the window (e.g. to close a viewer).
     escape->setEnabled(false);
     m_escape = escape;
+    // Alt+C and Alt+W toggle Match case and Whole words while the bar is shown.
+    for (auto [key, toggle] : {std::pair{Qt::Key_C, m_case}, {Qt::Key_W, m_words}}) {
+        auto* shortcut = new QShortcut(QKeySequence(Qt::ALT | key), tab);
+        shortcut->setContext(Qt::WidgetWithChildrenShortcut);
+        shortcut->setEnabled(false);
+        connect(shortcut, &QShortcut::activated, toggle, &QToolButton::toggle);
+        m_barShortcuts.append(shortcut);
+    }
     auto* backwards = new QShortcut(QKeySequence(Qt::SHIFT | Qt::Key_Return), m_query);
     connect(backwards, &QShortcut::activated, this, [this]() { findNext(true); });
     auto* doc = tab->document();
@@ -159,6 +168,7 @@ FindBar::~FindBar() = default;
 void FindBar::showEvent(QShowEvent* event)
 {
     m_escape->setEnabled(true);
+    for (QShortcut* shortcut : std::as_const(m_barShortcuts)) shortcut->setEnabled(true);
     QWidget::showEvent(event);
     // Until a result says otherwise: pushed down at the top of the text, covering below it.
     m_covering = m_tab->editor()->area()->verticalScrollBar()->value() > 0;
@@ -168,6 +178,7 @@ void FindBar::showEvent(QShowEvent* event)
 void FindBar::hideEvent(QHideEvent* event)
 {
     m_escape->setEnabled(false);
+    for (QShortcut* shortcut : std::as_const(m_barShortcuts)) shortcut->setEnabled(false);
     m_space->hide();
     QWidget::hideEvent(event);
 }
@@ -243,19 +254,26 @@ void FindBar::showSearch()
     const bool selectedResult = !isHidden() && m_current >= 0
         && offsetFor(area->selectionStart()) == m_matches[m_current].start
         && offsetFor(area->selectionEnd()) == m_matches[m_current].end;
-    // Capture the user's scope before navigation selects the first result.
-    if (isHidden() && !m_scope->isChecked()) {
+    // Opened with several lines or a long text selected: the search and its
+    // replacements keep to it (shown shaded), without the scope button; a
+    // short selection in a line is the text to search for. Captured before
+    // navigation selects the first result.
+    bool scoped = false;
+    if (isHidden()) {
         m_scopeAvailable = area->hasSelection();
         if (m_scopeAvailable) {
             m_scopeStart = offsetFor(area->selectionStart());
             m_scopeEnd = offsetFor(area->selectionEnd());
         }
+        scoped = m_scopeAvailable && (selection.contains('\n') || selection.size() > kLongSelection);
+        QSignalBlocker block(m_scope);
+        m_scope->setChecked(scoped);
     }
     // A read-only tab (e.g. a viewer) only searches.
     if (area->readOnly()) m_expand->setChecked(false);
     m_expand->setVisible(!area->readOnly());
     show();
-    if (!selectedResult && !selection.isEmpty() && !selection.contains('\n')) m_query->setText(selection);
+    if (!scoped && !selectedResult && !selection.isEmpty() && !selection.contains('\n')) m_query->setText(selection);
     rebuild();
     if (m_current < 0) reveal(area->visualRow(area->cursorPosition()));
     m_query->setFocus(); m_query->selectAll();
@@ -380,7 +398,10 @@ void FindBar::updateHighlights()
         const bool dark = area->palette().color(QPalette::Base).lightness() < 128;
         const QColor background(dark ? "#685326" : "#ffe39a");
         const QColor activeBackground(dark ? "#8d4d13" : "#ffae52");
-        selections.reserve(m_matches.size() + 1);
+        selections.reserve(m_matches.size() + 2);
+        // The selection searched in, shaded; its results over it.
+        if (m_scope->isChecked() && m_scopeAvailable && m_scopeEnd > m_scopeStart)
+            selections.append({positionFor(m_scopeStart), positionFor(m_scopeEnd), QColor(dark ? "#33404f" : "#e3ecf7"), {}});
         for (const auto& match : m_matches)
             selections.append({positionFor(match.start), positionFor(match.end), background, {}});
         if (m_current >= 0) {

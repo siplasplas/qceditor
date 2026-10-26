@@ -259,8 +259,13 @@ the current one. Use the arrows, Enter/F3 or Shift+Enter/Shift+F3 to navigate.
 With the bar closed, F3 and Shift+F3 select the next or previous result of the
 last query without showing the bar. When nothing is found, a tooltip at the
 caret says so, e.g. `"abcd" not found` (`"" not found` without a query).
-Options include wrap around, case sensitivity, whole words, regular expressions
-and searching inside the current selection. Escape closes the bar. Each tab
+Options include wrap around, case sensitivity (Alt+C while the bar is shown),
+whole words (Alt+W), regular expressions and searching inside the current
+selection. Opened with several lines or a text longer than 64 characters
+selected, the bar searches and replaces in the selection by itself (the scope
+button ▽ is checked): the selection is shaded, its results yellow, the current
+one orange; a shorter selection in a line is the text to search for. Escape
+closes the bar. Each tab
 keeps its own query and search options; search does not modify document contents.
 
 Search uses qcodeedit's `setSelection` and `setExtraSelections` APIs (requires
