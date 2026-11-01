@@ -12,6 +12,10 @@
 #include <QDialog>
 #include <QDialogButtonBox>
 #include <QDir>
+#include <QDragEnterEvent>
+#include <QDropEvent>
+#include <QMimeData>
+#include <QUrl>
 #include <QFileInfo>
 #include <QHash>
 #include <QInputDialog>
@@ -103,6 +107,7 @@ EditorWindow::EditorWindow(const EditorWindowOptions& options, QWidget* parent)
 {
     resize(1024, 768);
     setMinimumSize(600, 400);
+    setAcceptDrops(true);
 
     m_tabs = new MruTabWidget(this);
     m_tabs->setTabsClosable(true);
@@ -610,6 +615,35 @@ void EditorWindow::closeEvent(QCloseEvent* event)
 {
     if (closeAllTabs()) event->accept();
     else event->ignore();
+}
+
+// Files dragged from a file manager (text/uri-list) open in tabs, unless a
+// modal window is up: it would be behind the new tab.
+namespace {
+
+QStringList droppedFiles(const QMimeData* mime)
+{
+    QStringList files;
+    if (QApplication::activeModalWidget() || !mime->hasUrls()) return files;
+    for (const QUrl& url : mime->urls())
+        if (url.isLocalFile() && QFileInfo(url.toLocalFile()).isFile()) files << url.toLocalFile();
+    return files;
+}
+
+} // namespace
+
+void EditorWindow::dragEnterEvent(QDragEnterEvent* event)
+{
+    if (!droppedFiles(event->mimeData()).isEmpty()) event->acceptProposedAction();
+}
+
+void EditorWindow::dropEvent(QDropEvent* event)
+{
+    const QStringList files = droppedFiles(event->mimeData());
+    if (files.isEmpty()) return;
+    event->acceptProposedAction();
+    for (const QString& file : files) openFile(file);
+    activateWindow();
 }
 
 // --- Window title and status bar ---------------------------------------------
