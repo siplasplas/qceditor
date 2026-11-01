@@ -3,7 +3,7 @@
 #include <QPalette>
 #include <QPointer>
 #include <QDateTime>
-#include <qce/kate/KateTheme.h>
+#include <qce/kate/EditorSyntax.h>
 #include <memory>
 #include <qce/CodeEdit.h>
 #include <qce/SimpleTextDocument.h>
@@ -245,26 +245,13 @@ private:
     static QString spaceCorrectionText(const QString& typed, const QString& replacement);
     void onDocumentChanged();
     void showContextMenu(const QPoint& position);
-    void applyThemePalette();
-    qce::TextAttribute themedAttribute(const QString& style, const qce::TextAttribute& fallback) const;
-    void applyHighlighterForFile(const QString& path);
-    void applyCppHighlighter();
-    bool applyKateHighlighter(const QString& xmlPath);
-    void clearHighlighter();
 
     qce::SimpleTextDocument*                    m_doc          = nullptr;
     qce::CodeEdit*                              m_edit         = nullptr;
     std::unique_ptr<qce::LineNumberGutter>      m_lineNumbers;
     std::unique_ptr<qce::FoldingGutter>         m_foldGutter;
-    std::unique_ptr<qce::RulesHighlighter>      m_highlighter;
-    std::unique_ptr<qce::RuleBasedFoldingProvider> m_foldProvider;
-
-    enum class SyntaxMode { Automatic, PlainText, Manual };
-    SyntaxMode m_syntaxMode = SyntaxMode::Automatic;
-    QString m_syntaxFile;
-    QString m_themeFile;
-    KateTheme m_theme;
-    QPalette m_defaultPalette;
+    /// Syntax colours, folding and theme (qcodeedit-kate); goes before m_edit.
+    std::unique_ptr<qce::kate::EditorSyntax>    m_syntax;
 
     FindBar* m_findBar = nullptr;
     /// Shown above the editor when detection was not confident.

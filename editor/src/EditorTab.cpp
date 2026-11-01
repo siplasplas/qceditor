@@ -48,16 +48,8 @@
 #include <qce/FoldState.h>
 #include <qce/kate/KateTheme.h>
 #include <qce/kate/KatePaths.h>
-#include <qce/kate/KateXmlReader.h>
 
 namespace qceditor {
-
-// Used only when no Kate definition matches (e.g. data not downloaded yet).
-static bool isCppExtension(const QString& ext)
-{
-    static const QStringList cpp = {"c","cpp","cxx","cc","h","hpp","hxx"};
-    return cpp.contains(ext.toLower());
-}
 
 EditorTab::EditorTab(QWidget* parent)
     : QWidget(parent)
@@ -65,7 +57,6 @@ EditorTab::EditorTab(QWidget* parent)
     m_doc  = new qce::SimpleTextDocument(this);
     m_edit = new qce::CodeEdit(this);
     m_edit->setDocument(m_doc);
-    m_defaultPalette = m_edit->area()->palette();
     m_edit->area()->setContextMenuPolicy(Qt::CustomContextMenu);
     connect(m_edit->area(), &QWidget::customContextMenuRequested,
             this, &EditorTab::showContextMenu);
@@ -168,8 +159,8 @@ EditorTab::EditorTab(QWidget* parent)
     connect(m_doc, &qce::SimpleTextDocument::linesRemoved,
             this, &EditorTab::onDocumentChanged);
 
-    m_theme = KateTheme::loadDefault();
-    applyThemePalette();
+    // The default theme for the desktop until a file chooses a syntax.
+    m_syntax = std::make_unique<qce::kate::EditorSyntax>(m_edit);
 }
 
 // The editor and its undo stack go only after this object's own part; what
@@ -491,18 +482,15 @@ void EditorTab::showContextMenu(const QPoint& position)
         return action;
     };
 
-    auto* automatic = addChoice(syntaxMenu, tr("Automatic"),
-                                m_syntaxMode == SyntaxMode::Automatic);
+    using Mode = qce::kate::EditorSyntax::Mode;
+    auto* automatic = addChoice(syntaxMenu, tr("Automatic"), m_syntax->mode() == Mode::Automatic);
     connect(automatic, &QAction::triggered, this, [this]() {
-        m_syntaxMode = SyntaxMode::Automatic;
-        m_syntaxFile.clear();
+        m_syntax->setAutomatic();
         reapplyHighlighter();
     });
-    auto* plainText = addChoice(syntaxMenu, tr("Plain Text"),
-                                m_syntaxMode == SyntaxMode::PlainText);
+    auto* plainText = addChoice(syntaxMenu, tr("Plain Text"), m_syntax->mode() == Mode::PlainText);
     connect(plainText, &QAction::triggered, this, [this]() {
-        m_syntaxMode = SyntaxMode::PlainText;
-        m_syntaxFile.clear();
+        m_syntax->setPlainText();
         reapplyHighlighter();
     });
     syntaxMenu->addSeparator();
@@ -526,18 +514,19 @@ void EditorTab::showContextMenu(const QPoint& position)
         });
         for (const auto& entry : entries) {
             auto* action = addChoice(group, QString(entry.name).replace("&", "&&"),
-                m_syntaxMode == SyntaxMode::Manual && m_syntaxFile == entry.file);
+                m_syntax->mode() == Mode::Manual && m_syntax->syntaxFile() == entry.file);
             connect(action, &QAction::triggered, this, [this, file = entry.file]() {
-                const auto& index = SyntaxData::index();
-                const auto* language = index.byFile(file);
-                if (!language || language->unsupported
-                    || !applyKateHighlighter(index.filePath(*language))) {
-                    QMessageBox::warning(this, tr("Syntax"),
-                                         tr("Cannot load syntax definition: %1").arg(file));
-                    return;
-                }
-                m_syntaxMode = SyntaxMode::Manual;
-                m_syntaxFile = file;
+                // A definition that cannot be loaded leaves the syntax as it was.
+                const Mode mode = m_syntax->mode();
+                const QString previous = m_syntax->syntaxFile();
+                m_syntax->setManual(file);
+                m_syntax->apply();
+                if (m_edit->area()->highlighter()) return;
+                QMessageBox::warning(this, tr("Syntax"), tr("Cannot load syntax definition: %1").arg(file));
+                if (mode == Mode::Manual) m_syntax->setManual(previous);
+                else if (mode == Mode::PlainText) m_syntax->setPlainText();
+                else m_syntax->setAutomatic();
+                m_syntax->apply();
             });
         }
     }
@@ -550,20 +539,14 @@ void EditorTab::showContextMenu(const QPoint& position)
     auto addTheme = [&](const QString& name, const QString& path) {
         auto* action = themeMenu->addAction(QString(name).replace("&", "&&"));
         action->setCheckable(true);
-        action->setChecked(m_themeFile == path);
+        action->setChecked(m_syntax->themeFile() == path);
         themeChoices->addAction(action);
         connect(action, &QAction::triggered, this, [this, path]() {
-            KateTheme theme;
-            if (!path.isEmpty()) {
-                theme = KateTheme::load(path);
-                if (!theme.isValid()) {
-                    QMessageBox::warning(this, tr("Theme"),
-                                         tr("Cannot load theme: %1").arg(path));
-                    return;
-                }
+            if (!path.isEmpty() && !KateTheme::load(path).isValid()) {
+                QMessageBox::warning(this, tr("Theme"), tr("Cannot load theme: %1").arg(path));
+                return;
             }
-            m_themeFile = path;
-            m_theme = theme;
+            m_syntax->setThemeFile(path);
             reapplyHighlighter();
         });
     };
@@ -1172,8 +1155,7 @@ bool EditorTab::loadFile(const QString& path)
     }
     m_file->setLegacyLanguages(legacyLanguages());
     if (!finishRead(m_file->open(path), exists)) return false;
-    m_syntaxMode = SyntaxMode::Automatic;
-    m_syntaxFile.clear();
+    m_syntax->setAutomatic();
     reapplyHighlighter();
     return true;
 }
@@ -1280,251 +1262,13 @@ bool EditorTab::saveAs(const QString& path)
     return true;
 }
 
-void EditorTab::applyThemePalette()
-{
-    QPalette palette = m_defaultPalette;
-    if (m_theme.editorBackground.isValid()) {
-        palette.setColor(QPalette::Base, m_theme.editorBackground);
-        palette.setColor(QPalette::Window, m_theme.editorBackground);
-    }
-    const auto normal = m_theme.styles.constFind(QStringLiteral("Normal"));
-    if (normal != m_theme.styles.constEnd() && normal->fg.isValid()) {
-        palette.setColor(QPalette::Text, normal->fg);
-        palette.setColor(QPalette::WindowText, normal->fg);
-    }
-    m_edit->setPalette(palette);
-    m_edit->area()->setPalette(palette);
-    m_edit->area()->viewport()->setPalette(palette);
-    // The line with the caret: the background a little darker (white gives
-    // #F8F8F8), or lighter on a dark theme; the theme's tint stays.
-    const QColor base = palette.color(QPalette::Base);
-    m_edit->area()->setCurrentLineColor(base.lightness() > 128 ? base.darker(103)
-                                                               : base.lighter(140));
-    m_edit->area()->viewport()->update();
-    // Invalid colours (no theme, or missing in it) are derived from the palette.
-    m_edit->setGutterColors({m_theme.iconBorder, m_theme.lineNumbers, m_theme.separator});
-}
-
-qce::TextAttribute EditorTab::themedAttribute(const QString& style,
-                                             const qce::TextAttribute& fallback) const
-{
-    const auto entry = m_theme.styles.constFind(style);
-    if (entry == m_theme.styles.constEnd())
-        return fallback;
-    return {entry->fg.isValid() ? entry->fg : fallback.foreground,
-            entry->bg, entry->bold, entry->italic, entry->underline};
-}
-
 void EditorTab::reapplyHighlighter()
 {
-    if (!m_themeFile.isEmpty()) {
-        const auto theme = KateTheme::load(m_themeFile);
-        if (theme.isValid())
-            m_theme = theme;
-    } else {
-        // "Default": Breeze Light/Dark to match the desktop, or the editor's
-        // built-in black on white when the themes are not downloaded.
-        m_theme = KateTheme::loadDefault();
-    }
-    applyThemePalette();
-    if (m_syntaxMode == SyntaxMode::PlainText) {
-        clearHighlighter();
-    } else if (m_syntaxMode == SyntaxMode::Manual) {
-        const auto& index = SyntaxData::index();
-        const auto* entry = index.byFile(m_syntaxFile);
-        if (!entry || entry->unsupported || !applyKateHighlighter(index.filePath(*entry)))
-            clearHighlighter();
-    } else {
-        applyHighlighterForFile(filePath());
-    }
-}
-
-void EditorTab::applyHighlighterForFile(const QString& path)
-{
-    // Kate definitions downloaded by qcodeedit, matched by file name and
-    // sorted by priority (definitions needing a newer Kate are skipped).
-    const auto& index   = SyntaxData::index();
-    const auto  matches = index.forFileName(path);
-    if (!matches.isEmpty()) {
-        if (!applyKateHighlighter(index.filePath(*matches.first())))
-            clearHighlighter();
-        return;
-    }
-
-    // No Kate definition — fall back to built-in programmatic highlighter for C/C++
-    if (isCppExtension(QFileInfo(path).suffix())) {
-        applyCppHighlighter();
-        return;
-    }
-
-    clearHighlighter();
-}
-
-void EditorTab::applyCppHighlighter()
-{
-    using namespace qce;
-
-    auto hl = std::make_unique<RulesHighlighter>();
-
-    const int attrKw      = hl->addAttribute(themedAttribute(QStringLiteral("Keyword"), {QColor(0x00,0x00,0xAA), {}, true}));
-    const int attrType    = hl->addAttribute(themedAttribute(QStringLiteral("DataType"), {QColor(0x00,0x80,0x80), {}, true}));
-    const int attrString  = hl->addAttribute(themedAttribute(QStringLiteral("String"), {QColor(0xC0,0x10,0x10)}));
-    const int attrComment = hl->addAttribute(themedAttribute(QStringLiteral("Comment"), {QColor(0x80,0x80,0x80), {}, false, true}));
-    const int attrNumber  = hl->addAttribute(themedAttribute(QStringLiteral("DecVal"), {QColor(0x80,0x40,0x00)}));
-    const int attrPP      = hl->addAttribute(themedAttribute(QStringLiteral("Preprocessor"), {QColor(0x60,0x00,0x80)}));
-
-    const int klKeywords = hl->addKeywordList({"keywords", {
-        "if","else","return","for","while","do","break","continue",
-        "switch","case","default","goto","sizeof","alignof","noexcept",
-        "try","catch","throw","new","delete","operator","template",
-        "typename","namespace","using","class","struct","enum","union",
-        "public","protected","private","virtual","override","final",
-        "static","inline","explicit","friend","mutable","volatile",
-        "extern","register","typedef","nullptr","true","false","this",
-    }, true});
-
-    const int klTypes = hl->addKeywordList({"types", {
-        "int","void","char","bool","float","double","long","short",
-        "unsigned","signed","size_t","auto","const","constexpr",
-        "int8_t","int16_t","int32_t","int64_t",
-        "uint8_t","uint16_t","uint32_t","uint64_t",
-        "wchar_t","char8_t","char16_t","char32_t",
-    }, true});
-
-    // Contexts
-    HighlightContext ctxN{"Normal",       -1,          -1, 0, false, -1, {}};
-    HighlightContext ctxS{"String",       attrString,  -1, 0, false, -1, {}};
-    HighlightContext ctxC{"Char",         attrString,  -1, 0, false, -1, {}};
-    HighlightContext ctxB{"BlockComment", attrComment, -1, 0, false, -1, {}};
-    HighlightContext ctxL{"LineComment",  attrComment,  0, 1, false, -1, {}};
-    HighlightContext ctxP{"Preprocessor", attrPP,      0, 1, false, -1, {}};
-
-    const int normal       = hl->addContext(ctxN);
-    const int strCtx       = hl->addContext(ctxS);
-    const int charCtx      = hl->addContext(ctxC);
-    const int blockComment = hl->addContext(ctxB);
-    const int lineComment  = hl->addContext(ctxL);
-    const int preprocessor = hl->addContext(ctxP);
-
-    // Folding region IDs
-    const int rgCurly = hl->regionIdForName("curly");
-    const int rgComm  = hl->regionIdForName("Comment");
-
-    auto& norm = hl->contextRef(normal);
-
-    // Preprocessor lines (#include, #define, …)
-    norm.rules.push_back({HighlightRule::DetectChar, '#', {}, {}, true, {}, -1, -1,
-                          attrPP, preprocessor, 0, true/*firstNonSpace*/, false});
-    // Line comment //
-    norm.rules.push_back({HighlightRule::Detect2Chars, '/', '/', {}, true, {}, -1, -1,
-                          attrComment, lineComment, 0, false, false});
-    // Block comment /* — also starts Comment fold region
-    {
-        HighlightRule r;
-        r.kind = HighlightRule::Detect2Chars;
-        r.ch = '/'; r.ch1 = '*';
-        r.attributeId = attrComment; r.nextContextId = blockComment;
-        r.beginRegionId = rgComm;
-        norm.rules.push_back(r);
-    }
-    // String "
-    norm.rules.push_back({HighlightRule::DetectChar, '"', {}, {}, true, {}, -1, -1,
-                          attrString, strCtx, 0, false, false});
-    // Char '
-    norm.rules.push_back({HighlightRule::DetectChar, '\'', {}, {}, true, {}, -1, -1,
-                          attrString, charCtx, 0, false, false});
-    // Types (before keywords — both match identifiers)
-    norm.rules.push_back({HighlightRule::Keyword, {}, {}, {}, true, {}, klTypes, -1,
-                          attrType, -1, 0, false, false});
-    // Keywords
-    norm.rules.push_back({HighlightRule::Keyword, {}, {}, {}, true, {}, klKeywords, -1,
-                          attrKw, -1, 0, false, false});
-    // Numbers
-    { HighlightRule r; r.kind = HighlightRule::Int;   r.attributeId = attrNumber; norm.rules.push_back(r); }
-    { HighlightRule r; r.kind = HighlightRule::Float; r.attributeId = attrNumber; norm.rules.push_back(r); }
-    // Opening brace { — starts curly fold region
-    {
-        HighlightRule r;
-        r.kind = HighlightRule::DetectChar; r.ch = '{';
-        r.beginRegionId = rgCurly;
-        norm.rules.push_back(r);
-    }
-    // Closing brace } — ends curly fold region
-    {
-        HighlightRule r;
-        r.kind = HighlightRule::DetectChar; r.ch = '}';
-        r.endRegionId = rgCurly;
-        norm.rules.push_back(r);
-    }
-
-    // String context
-    auto& str = hl->contextRef(strCtx);
-    str.rules.push_back({HighlightRule::HlCStringChar, {}, {}, {}, true, {}, -1, -1,
-                         -1, -1, 0, false, false});
-    str.rules.push_back({HighlightRule::DetectChar, '"', {}, {}, true, {}, -1, -1,
-                         attrString, -1, 1, false, false});
-
-    // Char context
-    auto& ch = hl->contextRef(charCtx);
-    ch.rules.push_back({HighlightRule::HlCStringChar, {}, {}, {}, true, {}, -1, -1,
-                        -1, -1, 0, false, false});
-    ch.rules.push_back({HighlightRule::DetectChar, '\'', {}, {}, true, {}, -1, -1,
-                        attrString, -1, 1, false, false});
-
-    // Block comment context — closing */ ends Comment fold region
-    {
-        HighlightRule r;
-        r.kind = HighlightRule::Detect2Chars; r.ch = '*'; r.ch1 = '/';
-        r.attributeId = attrComment; r.nextContextId = -1; r.popCount = 1;
-        r.endRegionId = rgComm;
-        hl->contextRef(blockComment).rules.push_back(r);
-    }
-
-    hl->setInitialContextId(normal);
-
-    // Detach the old provider before its highlighter goes away.
-    m_edit->area()->setFoldingProvider(nullptr);
-    m_highlighter = std::move(hl);
-    m_edit->area()->setHighlighter(m_highlighter.get());
-
-    m_foldProvider = std::make_unique<qce::RuleBasedFoldingProvider>(m_highlighter.get());
-    m_foldProvider->setPlaceholderFor("curly",   "{…}");
-    m_foldProvider->setPlaceholderFor("Comment", "/*…*/");
-    m_edit->area()->setFoldingProvider(m_foldProvider.get());
+    // Theme and definition read again: by the file's name unless chosen.
+    m_syntax->setFileName(filePath());
+    m_syntax->apply();
+    // The tab's word wrap (on by default) reaches the area here.
     m_edit->area()->setWordWrap(m_wordWrap);
-}
-
-bool EditorTab::applyKateHighlighter(const QString& xmlPath)
-{
-    // ##Lang includes (e.g. Doxygen inside C++) are resolved through the index.
-    auto hl = KateXmlReader::load(xmlPath, m_theme, SyntaxData::index());
-    if (!hl) return false;
-
-    // Detach the old provider before its highlighter goes away.
-    m_edit->area()->setFoldingProvider(nullptr);
-    m_highlighter = std::move(hl);
-    m_edit->area()->setHighlighter(m_highlighter.get());
-
-    m_foldProvider = std::make_unique<qce::RuleBasedFoldingProvider>(m_highlighter.get());
-    m_foldProvider->setPlaceholderFor("Brace1",  "{…}");
-    m_foldProvider->setPlaceholderFor("brace",   "{…}");
-    m_foldProvider->setPlaceholderFor("curly",   "{…}");
-    m_foldProvider->setPlaceholderFor("square",  "[…]");
-    m_foldProvider->setPlaceholderFor("paren",   "(…)");
-    m_foldProvider->setPlaceholderFor("Comment", "/*…*/");
-    m_foldProvider->setPlaceholderFor("Region1", "//BEGIN…END");
-    m_edit->area()->setFoldingProvider(m_foldProvider.get());
-    m_edit->area()->setWordWrap(m_wordWrap);
-    return true;
-}
-
-void EditorTab::clearHighlighter()
-{
-    m_edit->area()->setHighlighter(nullptr);
-    m_edit->area()->setFoldingProvider(nullptr);
-    m_edit->area()->setWordWrap(m_wordWrap);
-    m_highlighter.reset();
-    m_foldProvider.reset();
 }
 
 } // namespace qceditor

@@ -4,7 +4,7 @@ Editor that uses qcodeedit and the shared MruTabWidget from qt-extra.
 
 ## Building
 
-Requires C++17, CMake 3.16+, Qt 6.2+, installed qcodeedit 1.68.0 packages
+Requires C++17, CMake 3.16+, Qt 6.2+, installed qcodeedit 1.69.0 packages
 (`qcodeedit`, `qcodeedit-kate`, `qcodeedit-katedata`, `qcodeedit-encoding`
 with [cpg](https://github.com/siplasplas/cpg), `qcodeedit-spell` and
 `qcodeedit-diff`), qt-extra 2.7 or later (moving older versions' files, see
