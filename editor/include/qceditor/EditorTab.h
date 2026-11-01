@@ -12,12 +12,12 @@
 #include <qce/RulesHighlighter.h>
 #include <qce/RuleBasedFoldingProvider.h>
 #include <qce/encoding/Encoding.h>
+#include <qce/encoding/TextFile.h>
 
 class QFrame;
 class QLabel;
 class QMenu;
 class QVBoxLayout;
-namespace qce::encoding { class EncodingGuard; }
 namespace qce::spell { class CodeEditSpelling; class SpellingReviewDialog; class GrammarReviewDialog; }
 
 namespace qceditor {
@@ -90,7 +90,7 @@ public:
     /// Takes the file as it is on disk now as the known version, so that
     /// hasExternalChanges() reports only later changes (e.g. after the user
     /// declined loading it).
-    void ignoreExternalChanges() { updateDiskStamp(); }
+    void ignoreExternalChanges() { m_file->ignoreExternalChanges(); }
     /// Reads the file again: only the lines that changed on disk are changed,
     /// as one undo step, so Ctrl+Z brings back the text before the reload.
     bool reloadFromDisk();
@@ -106,7 +106,7 @@ public:
     bool reopenWithEncoding(const QString& encoding);
     /// The plausible encodings when detection was not confident on opening
     /// (best first); empty when it was, or the encoding was chosen.
-    QList<qce::encoding::EncodingOption> uncertainEncodings() const { return m_uncertain.options; }
+    QList<qce::encoding::EncodingOption> uncertainEncodings() const { return m_file->uncertainDetection().options; }
     /// Opens the encoding choice dialog and reopens the file with the choice.
     void chooseEncoding();
     /// Saves from now on in `encoding`; the text stays as it is.
@@ -185,7 +185,7 @@ public:
     /// empty = the detected language.
     void setSpellLanguages(const QStringList& dictionaries);
 
-    QString filePath() const { return m_filePath; }
+    QString filePath() const { return m_file->path(); }
     /// Differs from the file: edited (undoing back to the saved text is not a
     /// change) or with another encoding to save in.
     bool    isModified() const;
@@ -212,18 +212,20 @@ signals:
     void spellingDictionariesChanged();
 
 private:
-    /// Empty `encoding` detects it. A reload (`asEdit`) keeps the undo
-    /// history: the new text is one undo step.
-    bool readFile(const QString& path, bool resetSyntax, const QString& encoding = {}, bool asEdit = false);
+    /// What follows reading the file (opened, reopened or reloaded): the
+    /// encoding notice when `detected` without confidence, the spelling data
+    /// of the file. False when reading failed or was cancelled.
+    bool finishRead(qce::encoding::TextFile::Result result, bool detected);
     /// Emits modificationChanged() when isModified() has changed.
     void updateModified();
     /// Replaces the bytes of an encrypted .een file with its text, asking for
     /// the password; false when cancelled or unreadable.
     bool decryptIfEncrypted(const QString& path, QByteArray* bytes);
+    /// Encrypts the bytes saved to a .een file, asking for a new password;
+    /// asks before a decrypted text is saved unencrypted.
+    qce::encoding::TextFile::Result encryptForSave(const QString& path, QByteArray* bytes);
     bool askNewPassword();
     void forgetPassword();
-    /// Removes trailing whitespace before saving, as trimWhitespace() says.
-    void trimTrailingWhitespace();
     void addEncodingMenu(QMenu& menu);
     /// Reopens as `encoding`, asking first when there are unsaved edits.
     void reopenAsking(const QString& encoding);
@@ -241,7 +243,6 @@ private:
     /// Asks for a block of lines, selects it and reviews its spelling or grammar.
     void reviewBlock(bool grammar);
     static QString spaceCorrectionText(const QString& typed, const QString& replacement);
-    void updateDiskStamp();
     void onDocumentChanged();
     void showContextMenu(const QPoint& position);
     void applyThemePalette();
@@ -269,7 +270,6 @@ private:
     /// Shown above the editor when detection was not confident.
     QFrame* m_encodingNotice = nullptr;
     QLabel* m_encodingNoticeText = nullptr;
-    qce::encoding::EncodingDetection m_uncertain;
     qce::spell::CodeEditSpelling* m_spelling = nullptr;
     /// The open Review Spelling window (not modal; the tab is read-only meanwhile).
     QPointer<qce::spell::SpellingReviewDialog> m_review;
@@ -277,24 +277,20 @@ private:
     int m_reviewBlock = 0;  ///< the block of lines reviewed last (reviewSpellingBlock())
     QStringList m_spellLanguages;  ///< chosen for this document; empty = detected
     QString m_spellMissing;        ///< language whose missing dictionary was reported
-    qce::encoding::EncodingGuard* m_encoding = nullptr;
+    /// Reading and saving the file, in its encoding (qcodeedit-encoding).
+    qce::encoding::TextFile* m_file = nullptr;
     bool m_saveCancelled = false;
     qce::encoding::Language m_language;
     int m_languageRequest = 0; ///< ignores results for an older load
 
-    QDateTime m_diskModified;
-    qint64 m_diskSize = -1;
-    QString m_filePath;
-    /// The encoding to save in was changed (not an undo step).
-    bool    m_formatChanged = false;
+    /// A new password, used when the file is saved next (not an undo step).
+    bool    m_passwordChanged = false;
     /// isModified() as last reported by modificationChanged().
     bool    m_reportedModified = false;
     bool    m_wordWrap = true;
     /// Password of an encrypted .een file, kept for saving and reloading.
     QString m_eenPassword;
     bool    m_loadCancelled = false;
-    /// The text as last read or saved, to tell the lines changed since.
-    QString m_savedText;
 };
 
 } // namespace qceditor

@@ -74,18 +74,32 @@ EditorTab::EditorTab(QWidget* parent)
     // (qcodeedit-diff; installed here as well in case the program's own
     // registration was not linked in).
     qce::diff::install();
-    connect(m_edit->area()->undoStack(), &QUndoStack::cleanChanged,
-            this, &EditorTab::updateModified);
 
-    // Keeps typed and pasted text storable in the file's code page.
-    m_encoding = new qce::encoding::EncodingGuard(m_edit->area(), this);
-    connect(m_encoding, &qce::encoding::EncodingGuard::encodingChanged,
-            this, &EditorTab::statusChanged);
-    // Switching to UTF-8 is a change that needs saving.
-    connect(m_encoding, &qce::encoding::EncodingGuard::encodingChanged, this, [this]() {
-        m_formatChanged = true;
-        hideEncodingNotice();
-        updateModified();
+    // Reads and saves the file in its encoding; its guard keeps typed and
+    // pasted text storable in the file's code page.
+    m_file = new qce::encoding::TextFile(m_edit->area(), m_doc, this);
+    m_file->setReadFilter([this](const QString& path, QByteArray* bytes) {
+        return decryptIfEncrypted(path, bytes) ? qce::encoding::TextFile::Result::Ok
+                                               : qce::encoding::TextFile::Result::Cancelled;
+    });
+    m_file->setWriteFilter([this](const QString& path, QByteArray* bytes) {
+        return encryptForSave(path, bytes);
+    });
+    connect(m_file, &qce::encoding::TextFile::modificationChanged, this, &EditorTab::updateModified);
+    connect(m_file, &qce::encoding::TextFile::formatChanged, this, &EditorTab::statusChanged);
+    // The user switched the encoding (e.g. to UTF-8): the guess is settled.
+    connect(m_file->guard(), &qce::encoding::EncodingGuard::encodingChanged,
+            this, &EditorTab::hideEncodingNotice);
+    // The language is guessed in the background; the file is shown at once.
+    connect(m_file, &qce::encoding::TextFile::loaded, this, [this](const QByteArray& content) {
+        m_language = {};
+        const int request = ++m_languageRequest;
+        qce::encoding::detectLanguageAsync(content, this, [this, request](const qce::encoding::Language& language) {
+            if (request != m_languageRequest) return;
+            m_language = language;
+            applySpellLanguages();
+            emit statusChanged();
+        });
     });
 
     // Wavy underlines under misspelled words in comments, strings and text;
@@ -162,9 +176,9 @@ EditorTab::EditorTab(QWidget* parent)
 // they report while going must not reach it.
 EditorTab::~EditorTab()
 {
-    disconnect(m_edit->area()->undoStack(), nullptr, this, nullptr);
     disconnect(m_doc, nullptr, this, nullptr);
-    disconnect(m_encoding, nullptr, this, nullptr);
+    disconnect(m_file, nullptr, this, nullptr);
+    disconnect(m_file->guard(), nullptr, this, nullptr);
     forgetPassword();
 }
 
@@ -303,7 +317,7 @@ bool EditorTab::isEncryptedFile(const QString& path)
 
 bool EditorTab::isEncrypted() const
 {
-    return een::isEenPath(m_filePath);
+    return een::isEenPath(filePath());
 }
 
 // The text of an encrypted .een file, asking for its password (the one it
@@ -346,7 +360,7 @@ bool EditorTab::decryptIfEncrypted(const QString& path, QByteArray* bytes)
 bool EditorTab::askNewPassword()
 {
     bool ok = false;
-    const QString name = m_filePath.isEmpty() ? tr("the file") : QFileInfo(m_filePath).fileName();
+    const QString name = filePath().isEmpty() ? tr("the file") : QFileInfo(filePath()).fileName();
     const QString first = QInputDialog::getText(this, tr("Set Password"),
                                                 tr("New password for %1:").arg(name),
                                                 QLineEdit::Password, QString(), &ok);
@@ -394,7 +408,7 @@ bool EditorTab::changePassword()
     }
     if (!askNewPassword()) return false;
     // Takes effect when the file is saved.
-    m_formatChanged = true;
+    m_passwordChanged = true;
     updateModified();
     return true;
 }
@@ -446,7 +460,7 @@ QString EditorTab::codePointAtCursor() const
 
 bool EditorTab::isModified() const
 {
-    return m_formatChanged || !m_edit->area()->undoStack()->isClean();
+    return m_passwordChanged || m_file->isModified();
 }
 
 void EditorTab::updateModified()
@@ -585,8 +599,8 @@ void EditorTab::addEncodingMenu(QMenu& menu)
             connect(action, &QAction::triggered, this, [apply, name]() { apply(name); });
         };
         // When detection was not sure: its options with their probability first.
-        if (withDetection && !m_uncertain.options.isEmpty()) {
-            for (const auto& option : m_uncertain.options) {
+        if (withDetection && !uncertainEncodings().isEmpty()) {
+            for (const auto& option : uncertainEncodings()) {
                 QString text = option.encoding;
                 const QString language = qce::encoding::languageName(option.language);
                 if (!language.isEmpty()) text += QStringLiteral(" — ") + language;
@@ -1006,41 +1020,9 @@ void EditorTab::setTrimWhitespace(TrimWhitespace mode)
                                                                                : QStringLiteral("changed"));
 }
 
-// One undo step: the new text goes through setText(), which with
-// qcodeedit-diff changes only the trimmed lines. The cursor's line is left
-// alone, so that typing on after a space goes on as typed.
-void EditorTab::trimTrailingWhitespace()
-{
-    const TrimWhitespace mode = trimWhitespace();
-    if (mode == TrimWhitespace::Off || !qce::lineDiff()) return;
-    QStringList lines = m_doc->toPlainText().split(QLatin1Char('\n'));
-    QVector<bool> trim(lines.size(), mode == TrimWhitespace::AllLines);
-    if (mode == TrimWhitespace::ChangedLines) {
-        // Lines nobody touched keep their whitespace (no stray changes, e.g. in git).
-        const QStringList saved = m_savedText.split(QLatin1Char('\n'));
-        for (const qce::LineChange& change : qce::lineDiff()(saved, lines))
-            for (int i = change.newStart; i < change.newStart + change.newCount && i < lines.size(); ++i)
-                trim[i] = true;
-    }
-    const int cursorLine = m_edit->area()->cursorPosition().line;
-    bool changed = false;
-    for (int i = 0; i < lines.size(); ++i) {
-        if (!trim[i] || i == cursorLine) continue;
-        QString& line = lines[i];
-        int end = int(line.size());
-        while (end > 0 && (line.at(end - 1) == QLatin1Char(' ') || line.at(end - 1) == QLatin1Char('\t')))
-            --end;
-        if (end == line.size()) continue;
-        line.truncate(end);
-        changed = true;
-    }
-    // setText() drops one final line break: the extra one keeps an empty last line.
-    if (changed) m_doc->setText(lines.join(QLatin1Char('\n')) + QLatin1Char('\n'));
-}
-
 void EditorTab::reopenAsking(const QString& name)
 {
-    if (m_filePath.isEmpty()) return;
+    if (filePath().isEmpty()) return;
     if (isModified() && QMessageBox::question(this, tr("Reopen with Encoding"),
             tr("Discard unsaved edits and read the file again as %1?").arg(name))
             != QMessageBox::Yes)
@@ -1053,12 +1035,12 @@ void EditorTab::reopenAsking(const QString& name)
 void EditorTab::showEncodingNotice()
 {
     QStringList options;
-    for (const auto& option : m_uncertain.options)
+    for (const auto& option : uncertainEncodings())
         options << QStringLiteral("%1 %2 %").arg(option.encoding).arg(qRound(option.confidence * 100));
     m_encodingNoticeText->setText(tr("Encoding uncertain: %1").arg(options.join(QStringLiteral(", "))));
     m_encodingNoticeText->setToolTip(tr("The file is shown as %1, the most likely encoding. "
                                         "Choose… compares the encodings on the lines where they differ.")
-                                         .arg(m_uncertain.options.value(0).encoding));
+                                         .arg(uncertainEncodings().value(0).encoding));
     m_encodingNotice->show();
 }
 
@@ -1069,12 +1051,12 @@ void EditorTab::hideEncodingNotice()
 
 void EditorTab::chooseEncoding()
 {
-    QFile file(m_filePath);
-    if (m_filePath.isEmpty() || !file.open(QIODevice::ReadOnly)) return;
+    QFile file(filePath());
+    if (filePath().isEmpty() || !file.open(QIODevice::ReadOnly)) return;
     QByteArray bytes = file.readAll();
-    if (!decryptIfEncrypted(m_filePath, &bytes)) return;
+    if (!decryptIfEncrypted(filePath(), &bytes)) return;
     // The options as detected on opening; detect again if the file has none.
-    QList<qce::encoding::EncodingOption> options = m_uncertain.options;
+    QList<qce::encoding::EncodingOption> options = uncertainEncodings();
     if (options.isEmpty()) options = qce::encoding::detectEncoding(bytes).options;
     EncodingChoiceDialog dialog(bytes, options, encoding(), m_edit->area()->font(), this);
     if (dialog.exec() != QDialog::Accepted || dialog.chosenEncoding().isEmpty()) return;
@@ -1144,24 +1126,29 @@ void EditorTab::showStatistics()
 
 qce::encoding::FileFormat EditorTab::fileFormat() const
 {
-    return m_encoding->format();
+    return m_file->format();
 }
 
 QString EditorTab::encoding() const
 {
-    return m_encoding->encoding();
+    return m_file->encoding();
 }
 
 bool EditorTab::reopenWithEncoding(const QString& encoding)
 {
     // Not an undo step: undoing it would bring back text decoded in the
     // other encoding while saving in this one.
-    return !m_filePath.isEmpty() && readFile(m_filePath, false, encoding);
+    if (filePath().isEmpty()) return false;
+    m_loadCancelled = false;
+    m_file->setLegacyLanguages(legacyLanguages());
+    if (!finishRead(m_file->reopen(encoding), false)) return false;
+    reapplyHighlighter();
+    return true;
 }
 
 void EditorTab::setSaveEncoding(const QString& encoding)
 {
-    m_encoding->setEncoding(encoding);
+    m_file->setSaveEncoding(encoding);
 }
 
 void EditorTab::onDocumentChanged()
@@ -1173,58 +1160,61 @@ void EditorTab::onDocumentChanged()
 
 bool EditorTab::loadFile(const QString& path)
 {
-    if (QFileInfo::exists(path))
-        return readFile(path, true);
-    // A name that does not exist yet (e.g. a new file named in a file manager):
-    // an empty UTF-8 document, saved there (a .een file asks for a password then).
-    forgetPassword();
-    m_doc->setText(QString());
-    m_savedText.clear();
-    m_edit->area()->undoStack()->clear();
-    {
-        const QSignalBlocker block(m_encoding);
-        m_encoding->setFormat({QStringLiteral("utf8"), false, false, true});
+    m_loadCancelled = false;
+    const bool exists = QFileInfo::exists(path);
+    if (!exists) {
+        // A name that does not exist yet (e.g. a new file named in a file
+        // manager): an empty UTF-8 document, saved there (a .een file asks
+        // for a password then). Nothing to guess its language from.
+        forgetPassword();
+        m_language = {};
+        ++m_languageRequest;
     }
-    hideEncodingNotice();
-    m_uncertain = {};
-    m_language = {};
-    ++m_languageRequest;
-    m_filePath = path;
-    // The words ignored in the file are kept for it.
-    m_spelling->setDocumentPath(m_filePath);
-    m_diskModified = {};
-    m_diskSize = -1;
-    m_formatChanged = false;
+    m_file->setLegacyLanguages(legacyLanguages());
+    if (!finishRead(m_file->open(path), exists)) return false;
     m_syntaxMode = SyntaxMode::Automatic;
     m_syntaxFile.clear();
     reapplyHighlighter();
+    return true;
+}
+
+bool EditorTab::finishRead(qce::encoding::TextFile::Result result, bool detected)
+{
+    if (result != qce::encoding::TextFile::Result::Ok) {
+        // A cancelled password question needs no error message.
+        if (result == qce::encoding::TextFile::Result::Cancelled) m_loadCancelled = true;
+        return false;
+    }
+    // Detected without confidence: shown with the most likely encoding at
+    // once, and a notice offers the choice. A given encoding (chosen, or kept
+    // on reload) keeps the options for the Reopen menu but needs no notice.
+    if (detected && !uncertainEncodings().isEmpty())
+        showEncodingNotice();
+    else
+        hideEncodingNotice();
+    m_passwordChanged = false;
+    // The words ignored in the file are kept for it.
+    m_spelling->setDocumentPath(filePath());
+    updateModified();
     emit statusChanged();
-    m_reportedModified = false;
-    emit modificationChanged(false);
     return true;
 }
 
 bool EditorTab::hasExternalChanges() const
 {
-    if (m_filePath.isEmpty()) return false;
-    const QFileInfo file(m_filePath);
-    return file.isFile() && (file.lastModified() != m_diskModified || file.size() != m_diskSize);
-}
-
-void EditorTab::updateDiskStamp()
-{
-    const QFileInfo file(m_filePath);
-    m_diskModified = file.lastModified();
-    m_diskSize = file.size();
+    return m_file->hasExternalChanges();
 }
 
 bool EditorTab::reloadFromDisk()
 {
-    if (m_filePath.isEmpty()) return false;
+    if (filePath().isEmpty()) return false;
     // Keep the encoding the file was opened in; detect again if it no longer
     // fits. The cursor and the selection follow the text they were in.
-    if (!readFile(m_filePath, false, encoding(), true) && !readFile(m_filePath, false, {}, true))
+    m_loadCancelled = false;
+    m_file->setLegacyLanguages(legacyLanguages());
+    if (!finishRead(m_file->reload(), false))
         return false;
+    reapplyHighlighter();
     auto* area = m_edit->area();
     const auto cursor = area->cursorPosition();
     const auto anchor = cursor == area->selectionStart() ? area->selectionEnd() : area->selectionStart();
@@ -1233,144 +1223,57 @@ bool EditorTab::reloadFromDisk()
     return true;
 }
 
-bool EditorTab::readFile(const QString& path, bool resetSyntax, const QString& encoding, bool asEdit)
-{
-    QFile f(path);
-    if (!f.open(QIODevice::ReadOnly))
-        return false;
-
-    const QFileInfo stamp(f);
-    const auto modified = stamp.lastModified();
-    const auto size = stamp.size();
-    QByteArray bytes = f.readAll();
-    if (f.error() != QFileDevice::NoError) return false;
-    m_loadCancelled = false;
-    if (!decryptIfEncrypted(path, &bytes)) return false;
-    // Code page or UTF, detected unless given; saved back the same way.
-    const auto decoded = qce::encoding::decode(bytes, encoding, legacyLanguages());
-    if (!decoded.ok) return false;
-    // Detected without confidence: shown with the most likely encoding at once,
-    // and a notice offers the choice. A given encoding (chosen, or kept on
-    // reload) keeps the options for the Reopen menu but needs no notice.
-    if (encoding.isEmpty())
-        m_uncertain = decoded.detection.confident ? qce::encoding::EncodingDetection() : decoded.detection;
-    if (encoding.isEmpty() && !m_uncertain.options.isEmpty())
-        showEncodingNotice();
-    else
-        hideEncodingNotice();
-
-    disconnect(m_doc, nullptr, this, nullptr);
-    // With qcodeedit-diff only the lines that differ change, as one undo step.
-    m_doc->setText(decoded.text);
-    m_savedText = m_doc->toPlainText();
-    if (asEdit)
-        m_edit->area()->undoStack()->setClean();
-    else
-        m_edit->area()->undoStack()->clear();
-    // A file opened (not reloaded) starts at its top: with qcodeedit-diff the
-    // text replaces the empty one as an edit, and the cursor went with the
-    // empty line the diff matched, often the last one.
-    if (resetSyntax)
-        m_edit->area()->setCursorPosition({0, 0});
-    {
-        // Loading is not an edit: no "modified" from the encoding change.
-        const QSignalBlocker block(m_encoding);
-        m_encoding->setFormat(decoded.format);
-    }
-    // The language is guessed in the background; the file is shown at once.
-    m_language = {};
-    const int request = ++m_languageRequest;
-    qce::encoding::detectLanguageAsync(bytes, this, [this, request](const qce::encoding::Language& language) {
-        if (request != m_languageRequest) return;
-        m_language = language;
-        applySpellLanguages();
-        emit statusChanged();
-    });
-    emit statusChanged();
-    m_formatChanged = false;
-    m_filePath = path;
-    // The words ignored in the file are kept for it.
-    m_spelling->setDocumentPath(m_filePath);
-    m_diskModified = modified;
-    m_diskSize = size;
-
-    connect(m_doc, &qce::SimpleTextDocument::linesChanged,
-            this, &EditorTab::onDocumentChanged);
-    connect(m_doc, &qce::SimpleTextDocument::linesInserted,
-            this, &EditorTab::onDocumentChanged);
-    connect(m_doc, &qce::SimpleTextDocument::linesRemoved,
-            this, &EditorTab::onDocumentChanged);
-
-    if (resetSyntax) {
-        m_syntaxMode = SyntaxMode::Automatic;
-        m_syntaxFile.clear();
-    }
-    reapplyHighlighter();
-    m_reportedModified = false;
-    emit modificationChanged(false);
-    return true;
-}
-
 bool EditorTab::save()
 {
-    if (m_filePath.isEmpty())
+    if (filePath().isEmpty())
         return false;
-    return saveAs(m_filePath);
+    return saveAs(filePath());
 }
 
-bool EditorTab::saveAs(const QString& path)
+// Encrypted, always in the newer (EdiQ) format; a new file asks for a password.
+qce::encoding::TextFile::Result EditorTab::encryptForSave(const QString& path, QByteArray* bytes)
 {
-    // In the file's encoding; characters it cannot store bring up a choice
-    // (write '?', switch to UTF-8, or cancel the save).
-    m_saveCancelled = false;
-    trimTrailingWhitespace();
-    QByteArray bytes;
-    if (!m_encoding->encodeForSave(m_doc->toPlainText(), &bytes)) {
-        m_saveCancelled = true;
-        return false;
-    }
+    using Result = qce::encoding::TextFile::Result;
     if (een::isEenPath(path)) {
-        // Encrypted, always in the newer (EdiQ) format; a new file asks for a password.
-        if (m_eenPassword.isEmpty() && !askNewPassword()) {
-            m_saveCancelled = true;
-            return false;
-        }
+        if (m_eenPassword.isEmpty() && !askNewPassword()) return Result::Cancelled;
         QGuiApplication::setOverrideCursor(Qt::WaitCursor);
-        bytes = een::encrypt(bytes, m_eenPassword);
+        *bytes = een::encrypt(*bytes, m_eenPassword);
         QGuiApplication::restoreOverrideCursor();
     } else if (!m_eenPassword.isEmpty()) {
         // The decrypted text would be readable by anyone.
         if (QMessageBox::question(this, tr("Save Without Encryption"),
                                   tr("%1 is not an encrypted .een file: the text will be saved unencrypted. "
                                      "Continue?").arg(QFileInfo(path).fileName()))
-            != QMessageBox::Yes) {
-            m_saveCancelled = true;
-            return false;
-        }
+            != QMessageBox::Yes)
+            return Result::Cancelled;
         forgetPassword();
     }
-    QSaveFile f(path);
-    f.setDirectWriteFallback(true);
-    if (!f.open(QIODevice::WriteOnly) || f.write(bytes) != bytes.size() || !f.commit())
-        return false;
+    return Result::Ok;
+}
 
-    const bool renamed = path != m_filePath;
-    // Saved as another file: the words ignored in the text go with it too.
-    if (renamed && !m_filePath.isEmpty()) qce::spell::copySpellingData(m_filePath, path);
-    m_filePath = path;
-    m_spelling->setDocumentPath(m_filePath);
-    updateDiskStamp();
-    m_savedText = m_doc->toPlainText();
-    m_formatChanged = false;
-    m_edit->area()->undoStack()->setClean();
-    updateModified();
-    if (m_encoding->format().mixedLineBreaks) {
-        // Saved with one kind of line break for every line.
-        auto format = m_encoding->format();
-        format.mixedLineBreaks = false;
-        const QSignalBlocker block(m_encoding);
-        m_encoding->setFormat(format);
+bool EditorTab::saveAs(const QString& path)
+{
+    // In the file's encoding; characters it cannot store bring up a choice
+    // (write '?', switch to UTF-8, or cancel the save), and so may the
+    // encryption of a .een file.
+    m_saveCancelled = false;
+    using Trim = qce::encoding::TextFile::TrimWhitespace;
+    const TrimWhitespace trim = trimWhitespace();
+    m_file->setTrimWhitespace(trim == TrimWhitespace::Off        ? Trim::Off
+                              : trim == TrimWhitespace::AllLines ? Trim::AllLines
+                                                                 : Trim::ChangedLines);
+    const QString previous = filePath();
+    const auto result = m_file->saveAs(path);
+    if (result != qce::encoding::TextFile::Result::Ok) {
+        m_saveCancelled = result == qce::encoding::TextFile::Result::Cancelled;
+        return false;
     }
+    const bool renamed = path != previous;
+    // Saved as another file: the words ignored in the text go with it too.
+    if (renamed && !previous.isEmpty()) qce::spell::copySpellingData(previous, path);
+    m_spelling->setDocumentPath(path);
+    m_passwordChanged = false;
+    updateModified();
     emit statusChanged();
     if (renamed)
         reapplyHighlighter();
@@ -1432,7 +1335,7 @@ void EditorTab::reapplyHighlighter()
         if (!entry || entry->unsupported || !applyKateHighlighter(index.filePath(*entry)))
             clearHighlighter();
     } else {
-        applyHighlighterForFile(m_filePath);
+        applyHighlighterForFile(filePath());
     }
 }
 

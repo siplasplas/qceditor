@@ -37,13 +37,14 @@ endif()
 # 1.37: openSpellingReview(), a Review Spelling window that is not modal
 # 1.38: suggestions kept, a second review at once
 # 1.46: the user's spelling data in SQLite, words ignored per file
+# 1.68: qce::encoding::TextFile reads and saves the tabs' files
 foreach(package qcodeedit qcodeedit-kate qcodeedit-katedata qcodeedit-encoding qcodeedit-spell qcodeedit-spelldata qcodeedit-diff)
     string(REPLACE "qcodeedit-" "" component ${package})
     if(package STREQUAL "qcodeedit")
         set(component qcodeedit)
     endif()
     if(NOT TARGET qcodeedit::${component})
-        find_package(${package} 1.66.0 REQUIRED)
+        find_package(${package} 1.68.0 REQUIRED)
     endif()
 endforeach()
 
