@@ -69,6 +69,8 @@ Tabs support reordering, pinning, Ctrl+Tab MRU navigation and bulk closing.
 A tab is titled with its file name, made unique with a number when another
 open file has the same name (`a.txt (2)`); new documents are `Untitled-1`,
 `Untitled-2`, …, and the Ctrl+Tab list shows the last two path components.
+Started without files, the editor opens an empty `Untitled-1`; with every tab
+closed, the window shows a light grey area.
 The window title shows the full path. The unpinned tab limit is 20: a new tab
 closes the least recently used one, without asking unless it has unsaved
 changes or its file was deleted on disk; then **Save and Close**, **Close

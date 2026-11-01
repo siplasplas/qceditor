@@ -136,6 +136,14 @@ EditorWindow::EditorWindow(const EditorWindowOptions& options, QWidget* parent)
         updateWindowTitle();
         updateStatusBar(tabAt(index));
     });
+    // Without tabs the style paints the pane white; light grey shows the
+    // window is empty.
+    auto emptyBackground = [this](int count) {
+        m_tabs->setStyleSheet(count == 0
+            ? QStringLiteral("QTabWidget::pane { background: lightgray; border: 0; }") : QString());
+    };
+    connect(m_tabs, &MruTabWidget::tabCountChanged, this, emptyBackground);
+    emptyBackground(0);
     updateWindowTitle();
     updateStatusBar(nullptr);
 

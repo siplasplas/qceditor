@@ -171,6 +171,8 @@ int main(int argc, char* argv[])
 
     for (int i = 1; i < argc; ++i)
         window.openFile(QString::fromLocal8Bit(argv[i]));
+    // Without files: an empty Untitled-1 to type into.
+    if (argc < 2) window.newFile();
 
     return app.exec();
 }
