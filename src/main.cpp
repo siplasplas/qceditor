@@ -6,6 +6,8 @@
 #include <QJsonArray>
 #include <QJsonDocument>
 #include <QJsonObject>
+#include <QLibrary>
+#include <QPluginLoader>
 #include <QSaveFile>
 #include <QSettings>
 #include <QStandardPaths>
@@ -13,8 +15,10 @@
 #include <qce/encoding/Encoding.h>
 #include <qce/kate/KatePaths.h>
 #include <qceditor/EditorWindow.h>
+#include <qceditor/FindPlugin.h>
 #include <qceditor/Settings.h>
 #include <qxmigration.h>
+#include "siplasplas/plugin/FindPlugin.h"
 
 namespace {
 
@@ -108,6 +112,28 @@ bool recognizeOldFile(const QString& path)
     return document.isObject() && document.object().contains(QStringLiteral("recentFiles"));
 }
 
+// The find bar module (spp-findbar), from $QCEDITOR_PLUGIN_PATH (directories
+// separated by ':'), the installed lib/qceditor/plugins next to bin, or
+// plugins/ in the build tree; null without it (the editor's own bar is used).
+spp::FindPlugin* loadFindPlugin()
+{
+    QStringList dirs = qEnvironmentVariable("QCEDITOR_PLUGIN_PATH").split(QLatin1Char(':'), Qt::SkipEmptyParts);
+    const QString bin = QCoreApplication::applicationDirPath();
+    dirs << QDir::cleanPath(bin + QStringLiteral("/" QCEDITOR_PLUGIN_DIR_FROM_BIN))
+         << QDir::cleanPath(bin + QStringLiteral("/plugins"));
+    for (const QString& path : std::as_const(dirs)) {
+        const QDir dir(path);
+        for (const QString& name : dir.entryList(QDir::Files, QDir::Name)) {
+            const QString file = dir.absoluteFilePath(name);
+            if (!QLibrary::isLibrary(file)) continue;
+            QPluginLoader loader(file);
+            if (auto* plugin = qobject_cast<spp::FindPlugin*>(loader.instance())) return plugin;  // kept loaded
+            loader.unload();
+        }
+    }
+    return nullptr;
+}
+
 } // namespace
 
 int main(int argc, char* argv[])
@@ -156,6 +182,7 @@ int main(int argc, char* argv[])
 
     QceditorSettings settings(recentFilesPath);
     qceditor::setSettings(&settings);
+    qceditor::setFindPlugin(loadFindPlugin());
 
     qceditor::EditorWindow window;
     window.show();

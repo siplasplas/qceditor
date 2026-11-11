@@ -65,6 +65,19 @@ Each program keeps the editor's settings in its own place: it passes its own
 `qceditor::Settings` to `qceditor::setSettings()`; without it the editor uses
 the application's QSettings.
 
+The find bar can come from the find bar module (`spp-findbar` of
+[siplasplas-plugins](https://github.com/siplasplas/siplasplas-plugins) 0.13):
+a program that loads it passes it to `qceditor::setFindPlugin()`
+(`<qceditor/FindPlugin.h>`) before creating editors, and their tabs then
+search and replace through the module's bar, below the text, which never
+moves; without it the tabs keep qceditor's own bar described below. The
+application builds the module along with itself (into `build/plugins`,
+installed to `lib/qceditor/plugins`; more directories in
+`QCEDITOR_PLUGIN_PATH`, separated by `:`) and uses it when it finds it. The
+library needs the module's interface only to build: a program fetching
+qceditor that has siplasplas-plugins already gives it; otherwise qceditor
+fetches it, headers only.
+
 Tabs support reordering, pinning, Ctrl+Tab MRU navigation and bulk closing.
 A tab is titled with its file name, made unique with a number when another
 open file has the same name (`a.txt (2)`); new documents are `Untitled-1`,

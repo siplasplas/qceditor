@@ -18,6 +18,8 @@ add_library(qceditor-editor STATIC
     src/EenFile.cpp
     src/EenFile.h
     src/FindBar.cpp
+    src/EditorFindTarget.cpp
+    src/EditorFindTarget.h
     src/EncodingChoiceDialog.cpp
     src/SpellLanguageDialog.cpp
     src/SyntaxData.cpp
@@ -26,6 +28,7 @@ add_library(qceditor-editor STATIC
     include/qceditor/EditorWindow.h
     include/qceditor/EditorTab.h
     include/qceditor/FindBar.h
+    include/qceditor/FindPlugin.h
     include/qceditor/EncodingChoiceDialog.h
     include/qceditor/SpellLanguageDialog.h
     include/qceditor/SyntaxData.h
@@ -53,6 +56,9 @@ target_link_libraries(qceditor-editor
         qcodeedit::spelldata
         qcodeedit::diff
         PkgConfig::QCEDITOR_BOTAN
+        # The find bar module's interface, headers only: not needed by
+        # programs linking the library.
+        $<BUILD_INTERFACE:siplasplas::plugin-api>
 )
 # Botan 3 needs C++20.
 target_compile_features(qceditor-editor PRIVATE cxx_std_20)
@@ -70,6 +76,7 @@ install(FILES
     include/qceditor/EditorWindow.h
     include/qceditor/EditorTab.h
     include/qceditor/FindBar.h
+    include/qceditor/FindPlugin.h
     include/qceditor/EncodingChoiceDialog.h
     include/qceditor/SpellLanguageDialog.h
     include/qceditor/SyntaxData.h

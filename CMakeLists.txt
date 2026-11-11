@@ -49,6 +49,32 @@ foreach(package qcodeedit qcodeedit-kate qcodeedit-katedata qcodeedit-encoding q
     endif()
 endforeach()
 
+# The find bar module (spp-findbar of siplasplas-plugins): its interface for
+# the editor library (headers only), and for the application the module
+# itself, built into <build>/plugins and installed to lib/qceditor/plugins.
+# A parent project that has siplasplas-plugins already (e.g. gemini-commander,
+# which fetches it before qceditor) builds the modules it wants itself.
+if(NOT TARGET siplasplas::plugin-api)
+    include(FetchContent)
+    set(SPP_BUILD_ARCHIVE OFF)
+    set(SPP_BUILD_EDITOR OFF)
+    set(SPP_BUILD_TESTS OFF)
+    if(QCEDITOR_BUILD_APP)
+        set(SPP_BUILD_FINDBAR ON)
+        set(SPP_PLUGIN_BUILD_DIR "${CMAKE_BINARY_DIR}/plugins")
+        set(SPP_PLUGIN_INSTALL_DIR "${CMAKE_INSTALL_LIBDIR}/qceditor/plugins")
+    else()
+        set(SPP_BUILD_FINDBAR OFF)
+    endif()
+    FetchContent_Declare(
+        siplasplas_plugins
+        GIT_REPOSITORY https://github.com/siplasplas/siplasplas-plugins.git
+        GIT_TAG v0.13.0
+        GIT_SHALLOW TRUE
+    )
+    FetchContent_MakeAvailable(siplasplas_plugins)
+endif()
+
 # The editor itself, shared with other programs (e.g. gemini-commander).
 add_subdirectory(editor)
 
@@ -58,6 +84,11 @@ add_subdirectory(editor)
 if(QCEDITOR_BUILD_APP)
     add_executable(qceditor src/main.cpp)
     target_compile_definitions(qceditor PRIVATE QCEDITOR_VERSION="${PROJECT_VERSION}")
+    # Where the find bar module is, relative to the program, when installed.
+    file(RELATIVE_PATH QCEDITOR_PLUGIN_DIR_FROM_BIN
+         "${CMAKE_INSTALL_PREFIX}/${CMAKE_INSTALL_BINDIR}"
+         "${CMAKE_INSTALL_PREFIX}/${CMAKE_INSTALL_LIBDIR}/qceditor/plugins")
+    target_compile_definitions(qceditor PRIVATE QCEDITOR_PLUGIN_DIR_FROM_BIN="${QCEDITOR_PLUGIN_DIR_FROM_BIN}")
     target_link_libraries(qceditor PRIVATE
         Qt6::Core
         Qt6::Gui
@@ -65,6 +96,7 @@ if(QCEDITOR_BUILD_APP)
         qt-extra
         qceditor::editor
         qcodeedit::katedata
+        siplasplas::plugin-api
     )
     # The icon: the window's (Alt+Tab on X11) from the resources, and for the
     # desktop (the Ubuntu dock, Wayland) in the icon theme with a .desktop file

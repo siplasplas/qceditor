@@ -1,5 +1,8 @@
 #include <qceditor/EditorTab.h>
 #include <qceditor/FindBar.h>
+#include <qceditor/FindPlugin.h>
+#include "EditorFindTarget.h"
+#include "siplasplas/plugin/FindPlugin.h"
 #include <qceditor/EncodingChoiceDialog.h>
 #include <qceditor/Settings.h>
 #include <qceditor/SpellLanguageDialog.h>
@@ -125,8 +128,13 @@ EditorTab::EditorTab(QWidget* parent)
     auto* layout = new QVBoxLayout(this);
     layout->setContentsMargins(0, 0, 0, 0);
     layout->setSpacing(0);
-    m_findBar = new FindBar(this);
-    layout->addWidget(m_findBar->space());
+    if (findPlugin()) {
+        m_findTarget = std::make_unique<EditorFindTarget>(this);
+        m_pluginFindBar = findPlugin()->createFindBar(this);
+    } else {
+        m_findBar = new FindBar(this);
+        layout->addWidget(m_findBar->space());
+    }
 
     // Non-modal notice when the encoding was guessed without confidence: the
     // file is already open with the most likely one.
@@ -151,6 +159,15 @@ EditorTab::EditorTab(QWidget* parent)
     layout->addWidget(m_encodingNotice);
 
     layout->addWidget(m_edit);
+    if (m_pluginFindBar) {
+        // Below the text, which never moves.
+        layout->addWidget(m_pluginFindBar->widget());
+        m_pluginFindBar->setTarget(m_findTarget.get());
+        // A file read anew: the matches are sought again (edits through
+        // onDocumentChanged()).
+        connect(m_doc, &qce::ITextDocument::documentReset, this,
+                [this] { m_pluginFindBar->editorTextChanged(); });
+    }
 
     connect(m_doc, &qce::SimpleTextDocument::linesChanged,
             this, &EditorTab::onDocumentChanged);
@@ -167,6 +184,8 @@ EditorTab::EditorTab(QWidget* parent)
 // they report while going must not reach it.
 EditorTab::~EditorTab()
 {
+    // The module's bar (a child, deleted later) lets go of its target first.
+    if (m_pluginFindBar) m_pluginFindBar->setTarget(nullptr);
     disconnect(m_doc, nullptr, this, nullptr);
     disconnect(m_file, nullptr, this, nullptr);
     disconnect(m_file->guard(), nullptr, this, nullptr);
@@ -203,17 +222,21 @@ void EditorTab::revealRange(qce::TextCursor start, qce::TextCursor end)
 
 void EditorTab::showSearch()
 {
-    m_findBar->showSearch();
+    if (m_pluginFindBar) m_pluginFindBar->showFind();
+    else m_findBar->showSearch();
 }
 
 void EditorTab::showReplace()
 {
-    m_findBar->showReplace();
+    if (m_pluginFindBar) m_pluginFindBar->showReplace();
+    else m_findBar->showReplace();
 }
 
 void EditorTab::findNext(bool backwards)
 {
-    m_findBar->findNext(backwards);
+    if (!m_pluginFindBar) m_findBar->findNext(backwards);
+    else if (backwards) m_pluginFindBar->findPrevious();
+    else m_pluginFindBar->findNext();
 }
 
 void EditorTab::goToPosition()
@@ -1139,6 +1162,9 @@ void EditorTab::onDocumentChanged()
     // Editing keeps the encoding the file is shown in. Whether the text
     // differs from the file follows the undo history (updateModified()).
     hideEncodingNotice();
+    // The module's bar seeks its matches again (its own bar follows the
+    // document itself).
+    if (m_pluginFindBar) m_pluginFindBar->editorTextChanged();
 }
 
 bool EditorTab::loadFile(const QString& path)

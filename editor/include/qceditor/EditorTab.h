@@ -19,10 +19,12 @@ class QLabel;
 class QMenu;
 class QVBoxLayout;
 namespace qce::spell { class CodeEditSpelling; class SpellingReviewDialog; class GrammarReviewDialog; }
+namespace spp { class FindBar; }
 
 namespace qceditor {
 
 class FindBar;
+class EditorFindTarget;
 
 class EditorTab : public QWidget
 {
@@ -253,7 +255,12 @@ private:
     /// Syntax colours, folding and theme (qcodeedit-kate); goes before m_edit.
     std::unique_ptr<qce::kate::EditorSyntax>    m_syntax;
 
+    /// qceditor's own find bar over the top lines, or, when the program gave
+    /// the find bar module (setFindPlugin()), the module's bar below the text
+    /// with this tab as its target.
     FindBar* m_findBar = nullptr;
+    spp::FindBar* m_pluginFindBar = nullptr;
+    std::unique_ptr<EditorFindTarget> m_findTarget;
     /// Shown above the editor when detection was not confident.
     QFrame* m_encodingNotice = nullptr;
     QLabel* m_encodingNoticeText = nullptr;
