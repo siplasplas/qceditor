@@ -12,6 +12,9 @@ include(GNUInstallDirs)
 # A program that fetches qceditor for its editor library (e.g.
 # gemini-commander) does not build the application.
 option(QCEDITOR_BUILD_APP "Build the QCEditor application" ${PROJECT_IS_TOP_LEVEL})
+# Fast offscreen tests (ctest); they need the find bar module the
+# application builds.
+option(QCEDITOR_BUILD_TESTS "Build the tests" ${PROJECT_IS_TOP_LEVEL})
 
 find_package(Qt6 6.2 REQUIRED COMPONENTS Core Gui Widgets)
 # Targets a parent project already has (e.g. fetched) are not looked for again.
@@ -106,4 +109,9 @@ if(QCEDITOR_BUILD_APP)
     configure_file(res/qceditor.desktop.in ${CMAKE_CURRENT_BINARY_DIR}/qceditor.desktop @ONLY)
     install(FILES ${CMAKE_CURRENT_BINARY_DIR}/qceditor.desktop DESTINATION ${CMAKE_INSTALL_DATADIR}/applications)
     install(FILES res/qceditor.svg DESTINATION ${CMAKE_INSTALL_DATADIR}/icons/hicolor/scalable/apps)
+endif()
+
+if(QCEDITOR_BUILD_TESTS AND TARGET spp-findbar)
+    enable_testing()
+    add_subdirectory(tests)
 endif()

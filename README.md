@@ -29,6 +29,10 @@ cmake --build build
 ./build/qceditor [file ...]
 ```
 
+The fast tests (offscreen, a few seconds; the editor tabs with the find bar
+module) run with `ctest --test-dir build --output-on-failure`
+(`QCEDITOR_BUILD_TESTS`, on when qceditor is built on its own).
+
 `sudo cmake --install build` also installs the application with its icon
 (`share/icons/hicolor/scalable/apps/qceditor.svg`) and
 `share/applications/qceditor.desktop`, so that the desktop (the Ubuntu dock,
